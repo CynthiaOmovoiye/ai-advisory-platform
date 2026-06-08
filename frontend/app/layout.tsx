@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { UserMenu } from "@/components/UserMenu";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <a href="/admin" className="hover:text-slate-900">Admin</a>
                 <a href="/eval" className="hover:text-slate-900">Evaluation</a>
               </nav>
+              <UserMenu />
             </div>
           </header>
           <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>

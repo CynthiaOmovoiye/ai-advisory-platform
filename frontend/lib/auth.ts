@@ -4,11 +4,11 @@
  * Owns the user session. After authentication, the user's id, active organization,
  * and roles are carried on the session; `getSessionIdentity()` projects them into the
  * narrow shape the BFF token (ADR-0009) needs. In production you would swap the demo
- * Credentials provider for a real IdP — nothing downstream changes.
  */
 import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
+import { signinWithCredentials, switchActiveOrganization, type AuthMembership } from "./backend-auth";
 import type { SessionIdentity } from "./session-token";
 
 declare module "next-auth" {
@@ -16,47 +16,58 @@ declare module "next-auth" {
     org?: string;
     globalRoles?: string[];
     orgRoles?: Record<string, string[]>;
+    memberships?: AuthMembership[];
     user: { id: string } & DefaultSession["user"];
   }
 }
 
-// DEMO-ONLY login. It accepts any email/password and grants a global-admin session so
-// the whole UI is exercisable end-to-end. It is **opt-in** — enabled ONLY when
-// AUTH_DEMO_MODE is exactly "true". A missing or misspelled value leaves it OFF, so the
-// production-safe default is fail-closed: no provider until a real IdP is wired (see
-// frontend/README.md "Authentication" and ADR-0009 for the backend trust boundary).
-const demoMode = process.env.AUTH_DEMO_MODE === "true";
-if (demoMode) {
-  // Loud signal so a demo build is never mistaken for a hardened one.
-  console.warn("[auth] AUTH_DEMO_MODE=true — demo login enabled (any credentials → admin).");
-}
-
-const demoProvider = Credentials({
+const credentialsProvider = Credentials({
   credentials: { email: {}, password: {} },
   async authorize(creds) {
-    if (!creds?.email) return null;
-    return {
-      id: "demo-user",
-      email: String(creds.email),
-      name: "Demo User",
-      org: "demo-org",
-      globalRoles: ["admin"],
-    } as unknown as { id: string };
+    if (!creds?.email || !creds?.password) return null;
+    try {
+      const user = await signinWithCredentials(String(creds.email), String(creds.password));
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name ?? user.email,
+        org: user.active_org,
+        globalRoles: user.global_roles,
+        orgRoles: user.org_roles,
+        memberships: user.memberships,
+      } as unknown as { id: string };
+    } catch {
+      return null;
+    }
   },
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
-  // In production (AUTH_DEMO_MODE=false) there is NO provider here until a real IdP is
-  // configured — login fails closed rather than granting admin to anyone.
-  providers: demoMode ? [demoProvider] : [],
+  providers: [credentialsProvider],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         const u = user as Record<string, unknown>;
         token.org = u.org;
         token.orgRoles = u.orgRoles;
         token.globalRoles = u.globalRoles;
+        token.memberships = u.memberships;
+      }
+      if (trigger === "update" && session?.org && token.sub && token.org) {
+        const profile = await switchActiveOrganization(
+          {
+            userId: String(token.sub),
+            activeOrg: String(token.org),
+            globalRoles: (token.globalRoles as string[] | undefined) ?? [],
+            orgRoles: (token.orgRoles as Record<string, string[]> | undefined) ?? {},
+          },
+          String(session.org),
+        );
+        token.org = profile.active_org;
+        token.orgRoles = profile.org_roles;
+        token.globalRoles = profile.global_roles;
+        token.memberships = profile.memberships;
       }
       return token;
     },
@@ -65,6 +76,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.org = token.org as string | undefined;
       session.orgRoles = token.orgRoles as Record<string, string[]> | undefined;
       session.globalRoles = token.globalRoles as string[] | undefined;
+      session.memberships = token.memberships as AuthMembership[] | undefined;
       return session;
     },
   },
