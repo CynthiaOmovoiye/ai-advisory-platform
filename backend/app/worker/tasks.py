@@ -18,9 +18,11 @@ from app.repositories.base import TenantScope
 from app.repositories.sql import (
     SqlAssessmentRepository,
     SqlAuditSink,
+    SqlDocumentRepository,
     SqlRecommendationRepository,
     SqlReportRepository,
 )
+from app.services.document_service import DocumentService
 
 _engine = None
 _session_factory = None
@@ -69,3 +71,27 @@ def generate_report(
         )
         report = service.generate(scope, assessment_id, organization_name=organization_name)
         return {"report_id": report.id, "status": report.status, "pdf_key": report.pdf_storage_key}
+
+
+@celery_app.task(name="documents.scan", bind=True, max_retries=3, default_retry_delay=10)
+def scan_document(
+    self, *, document_id: str, organization_id: str, actor_user_id: str
+) -> dict:  # pragma: no cover - requires Redis + storage
+    """Malware-scan a freshly uploaded document, off the request path. Until this runs
+    and marks the document 'clean', it cannot be downloaded (the gate)."""
+    settings = get_settings()
+    with session_scope(_factory()) as session:
+        service = DocumentService(
+            documents=SqlDocumentRepository(session),
+            assessments=SqlAssessmentRepository(session),
+            storage=S3Storage(
+                endpoint=settings.storage_endpoint,
+                bucket=settings.storage_bucket,
+                access_key=settings.storage_access_key,
+                secret_key=settings.storage_secret_key,
+                region=settings.storage_region,
+            ),
+            audit=SqlAuditSink(session),
+        )
+        doc = service.scan(organization_id, document_id, actor_user_id)
+        return {"document_id": doc.id, "scan_status": doc.scan_status}

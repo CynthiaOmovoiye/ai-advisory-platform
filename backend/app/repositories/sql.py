@@ -27,6 +27,7 @@ from app.llm.enhancement import Recommendation
 
 from .base import (
     AssessmentRecord,
+    DocumentRecord,
     MemberRecord,
     OrganizationRecord,
     QuestionRecord,
@@ -40,6 +41,7 @@ from .orm import (
     AssessmentSection,
     AssessmentTemplate,
     AuditLogRow,
+    Document,
     EvaluationRunRow,
     LlmCallRow,
     Organization,
@@ -537,4 +539,70 @@ def _to_template(row: AssessmentTemplate) -> TemplateRecord:
             )
             for s in row.sections
         ),
+    )
+
+
+class SqlDocumentRepository:
+    def __init__(self, session: Session) -> None:
+        self._s = session
+
+    def create(self, document: DocumentRecord, scope: TenantScope) -> None:
+        self._s.add(
+            Document(
+                id=document.id,
+                organization_id=scope.organization_id,  # scope owns the org
+                assessment_id=document.assessment_id,
+                original_filename=document.original_filename,
+                storage_key=document.storage_key,
+                mime_type=document.mime_type,
+                byte_size=document.byte_size,
+                sha256=document.sha256,
+                scan_status=document.scan_status,
+            )
+        )
+        self._s.flush()
+
+    def list_for_assessment(self, assessment_id: str, scope: TenantScope) -> list[DocumentRecord]:
+        rows = self._s.execute(
+            select(Document).where(
+                Document.assessment_id == assessment_id,
+                Document.organization_id == scope.organization_id,
+            )
+        ).scalars()
+        return [_to_document(r) for r in rows]
+
+    def get(self, document_id: str, scope: TenantScope) -> DocumentRecord | None:
+        row = self._s.execute(
+            select(Document).where(
+                Document.id == document_id,
+                Document.organization_id == scope.organization_id,  # tenant filter
+            )
+        ).scalar_one_or_none()
+        return _to_document(row) if row else None
+
+    def set_scan_status(self, document_id: str, status: str, scope: TenantScope) -> DocumentRecord:
+        row = self._s.execute(
+            select(Document).where(
+                Document.id == document_id,
+                Document.organization_id == scope.organization_id,
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise KeyError(document_id)
+        row.scan_status = status
+        self._s.flush()
+        return _to_document(row)
+
+
+def _to_document(row: Document) -> DocumentRecord:
+    return DocumentRecord(
+        id=row.id,
+        organization_id=row.organization_id,
+        assessment_id=row.assessment_id,
+        original_filename=row.original_filename,
+        storage_key=row.storage_key,
+        mime_type=row.mime_type,
+        byte_size=row.byte_size,
+        sha256=row.sha256,
+        scan_status=row.scan_status,
     )

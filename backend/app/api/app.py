@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from app.api.v1 import (
     admin,
     assessments,
+    documents,
     evaluation,
     organizations,
     recommendations,
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/v1")
     app.include_router(evaluation.router, prefix="/v1")
     app.include_router(templates.router, prefix="/v1")
+    app.include_router(documents.router, prefix="/v1")
     return app
 
 

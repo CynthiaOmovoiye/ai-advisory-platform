@@ -42,6 +42,7 @@ from app.repositories.base import TenantScope
 from app.repositories.sql import (
     SqlAssessmentRepository,
     SqlAuditSink,
+    SqlDocumentRepository,
     SqlEvaluationRunRepository,
     SqlLlmCallSink,
     SqlMemberRepository,
@@ -51,6 +52,7 @@ from app.repositories.sql import (
     SqlTemplateRepository,
 )
 from app.services.assessment_service import AssessmentService
+from app.services.document_service import DocumentService
 from app.services.evaluation_service import EvaluationService
 from app.services.metrics_service import SqlMetricsRepository
 from app.services.organization_service import OrganizationService
@@ -182,6 +184,33 @@ def get_assessment_service(
 
 def get_template_service(db: Session = Depends(get_db)) -> TemplateService:
     return TemplateService(templates=SqlTemplateRepository(db))
+
+
+def get_document_service(
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    storage: ObjectStorage = Depends(get_storage),
+) -> DocumentService:
+    return DocumentService(
+        documents=SqlDocumentRepository(db),
+        assessments=SqlAssessmentRepository(db),
+        storage=storage,
+        audit=SqlAuditSink(db),
+        max_upload_bytes=settings.max_upload_bytes,
+    )
+
+
+def get_scan_enqueuer() -> Callable[..., None]:
+    """Enqueue the malware-scan task onto Celery. Overridable in tests."""
+
+    def enqueue(*, document_id: str, organization_id: str, actor_user_id: str) -> None:
+        from app.worker.tasks import scan_document
+
+        scan_document.delay(
+            document_id=document_id, organization_id=organization_id, actor_user_id=actor_user_id
+        )
+
+    return enqueue
 
 
 def get_recommendation_service(db: Session = Depends(get_db)) -> RecommendationService:

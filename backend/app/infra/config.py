@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # API security
     rate_limit_per_minute: int = 120
     max_request_bytes: int = 1_048_576
+    max_upload_bytes: int = 26_214_400  # 25 MiB for PDF/DOCX uploads
     cors_allowed_origins: str = "http://localhost:3000"
 
     @property

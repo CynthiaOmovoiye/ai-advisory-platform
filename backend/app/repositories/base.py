@@ -176,3 +176,27 @@ class TemplateRepository(Protocol):
     def list(self) -> list[TemplateRecord]: ...
     def get(self, template_id: str) -> TemplateRecord | None: ...
     def set_status(self, template_id: str, status: str) -> TemplateRecord: ...
+
+
+@dataclass(frozen=True)
+class DocumentRecord:
+    id: str
+    organization_id: str
+    assessment_id: str | None
+    original_filename: str
+    storage_key: str
+    mime_type: str
+    byte_size: int
+    sha256: str
+    scan_status: str
+
+
+class DocumentRepository(Protocol):
+    def create(self, document: DocumentRecord, scope: TenantScope) -> None: ...
+    def list_for_assessment(
+        self, assessment_id: str, scope: TenantScope
+    ) -> list[DocumentRecord]: ...
+    def get(self, document_id: str, scope: TenantScope) -> DocumentRecord | None: ...
+    def set_scan_status(
+        self, document_id: str, status: str, scope: TenantScope
+    ) -> DocumentRecord: ...

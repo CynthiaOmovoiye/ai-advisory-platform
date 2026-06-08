@@ -23,6 +23,7 @@ dependencies = [
     "alembic>=1.13",
     "httpx>=0.27",            # OpenRouter client
     "pyjwt>=2.8",             # BFF session-token verification (ADR-0009)
+    "python-multipart>=0.0.9",  # file uploads
     "uvicorn>=0.30",
 ]
 

@@ -183,6 +183,25 @@ class EvaluationRunRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class Document(Base):
+    """An uploaded file (PDF/DOCX). Stored outside any public path; not servable until
+    scan_status == 'clean' (security-review §5)."""
+
+    __tablename__ = "documents"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    assessment_id: Mapped[str] = mapped_column(String, nullable=True)
+    original_filename: Mapped[str] = mapped_column(String, nullable=False)
+    storage_key: Mapped[str] = mapped_column(String, nullable=False)  # opaque object-store key
+    mime_type: Mapped[str] = mapped_column(String, nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    scan_status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class LlmCallRow(Base):
     """One LLM invocation — the observability/cost record (architecture §7)."""
 
