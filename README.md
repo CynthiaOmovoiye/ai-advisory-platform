@@ -1,5 +1,7 @@
 # AI Advisory Platform
 
+[![CI](https://github.com/CynthiaOmovoiye/ai-advisory-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/CynthiaOmovoiye/ai-advisory-platform/actions/workflows/ci.yml)
+
 > A platform that assesses an organization's readiness for AI adoption and produces
 > architecture, security, governance, and risk recommendations — combining a
 > **deterministic rule engine** with **LLM-assisted reasoning**, wrapped in
