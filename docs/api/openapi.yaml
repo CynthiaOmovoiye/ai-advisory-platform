@@ -1,0 +1,611 @@
+openapi: 3.1.0
+info:
+  title: AI Advisory Platform API
+  version: 0.1.0
+  description: |
+    Contract-first API surface for the AI Advisory Platform.
+
+    Design notes that the contract encodes:
+      * **Default deny.** Every operation lists a security requirement; an operation
+        without one is treated as forbidden, not public.
+      * **Tenant scope is implicit.** `organization_id` is derived from the
+        authenticated principal — it is NOT a request parameter on tenant-owned
+        reads. Clients cannot select a tenant.
+      * **Errors are sanitized.** All non-2xx responses use the `Error` schema:
+        a code, a generic message, and a correlation id. No stack traces, ever.
+      * **Recommendations carry provenance.** Each one references its source rule and,
+        if enhanced, the prompt/model version and grounding result.
+    This document is the design baseline; the running API is generated from FastAPI +
+    Pydantic and validated against this contract.
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+  - url: http://localhost:8000/v1
+    description: Local
+
+security:
+  - sessionCookie: []        # default for the whole API; public ops override with `security: []`
+
+tags:
+  - name: Auth
+  - name: Organizations
+  - name: Assessments
+  - name: Rules
+  - name: Recommendations
+  - name: Reports
+  - name: Evaluation
+  - name: Admin
+
+paths:
+  # ---- Auth -----------------------------------------------------------------
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []          # public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: Created; verification email sent }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Validation' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate and start a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '204': { description: Session established (httpOnly cookie set) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Invalidate the current session
+      responses:
+        '204': { description: Session invalidated }
+
+  /auth/password-reset/request:
+    post:
+      tags: [Auth]
+      summary: Request a password reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties: { email: { type: string, format: email } }
+      responses:
+        '204': { description: Always 204 (no account enumeration) }
+
+  /auth/email/verify:
+    post:
+      tags: [Auth]
+      summary: Verify email with a single-use token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties: { token: { type: string } }
+      responses:
+        '204': { description: Verified }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /me:
+    get:
+      tags: [Auth]
+      summary: Current principal (identity, roles, org memberships)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Principal' }
+
+  # ---- Organizations --------------------------------------------------------
+  /organizations:
+    post:
+      tags: [Organizations]
+      summary: Create an organization
+      x-rbac: [admin, consultant]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name: { type: string, maxLength: 200 }
+                slug: { type: string, pattern: '^[a-z0-9-]{3,40}$' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /organizations/{orgId}/members:
+    post:
+      tags: [Organizations]
+      summary: Invite a member
+      x-rbac: [admin, consultant, org_user_admin]
+      parameters: [ { $ref: '#/components/parameters/OrgId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [org_user, consultant] }
+      responses:
+        '202': { description: Invitation sent }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ---- Assessments ----------------------------------------------------------
+  /assessments:
+    get:
+      tags: [Assessments]
+      summary: List assessments for the caller's organization
+      description: Tenant scope is implicit (from session). No org parameter.
+      parameters:
+        - { $ref: '#/components/parameters/Status' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssessmentPage' }
+    post:
+      tags: [Assessments]
+      summary: Start an assessment from a published template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [templateId]
+              properties: { templateId: { type: string, format: uuid } }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Assessment' }
+
+  /assessments/{id}:
+    get:
+      tags: [Assessments]
+      summary: Get an assessment (with sections/questions/responses)
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Assessment' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /assessments/{id}/responses:
+    put:
+      tags: [Assessments]
+      summary: Upsert responses (validated per question type)
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [responses]
+              properties:
+                responses:
+                  type: array
+                  items: { $ref: '#/components/schemas/ResponseInput' }
+      responses:
+        '200': { description: Saved }
+        '422': { $ref: '#/components/responses/Validation' }
+
+  /assessments/{id}/complete:
+    post:
+      tags: [Assessments]
+      summary: Complete an assessment; runs the rule engine, enqueues LLM enhancement
+      description: |
+        Idempotent (idempotency-key). Pins the active ruleset version, evaluates
+        deterministically, persists recommendations (status=draft), then enqueues
+        enhancement + evaluation. Returns immediately; poll the assessment/recommendations.
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        '202':
+          description: Accepted; processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assessmentId: { type: string, format: uuid }
+                  status: { type: string, example: evaluating }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ---- Recommendations (consultant workspace) -------------------------------
+  /assessments/{id}/recommendations:
+    get:
+      tags: [Recommendations]
+      summary: List recommendations for an assessment (with provenance)
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Recommendation' }
+
+  /recommendations/{id}:
+    patch:
+      tags: [Recommendations]
+      summary: Edit / approve / reject a recommendation (consultant)
+      x-rbac: [consultant, admin]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                finding: { type: string }
+                rationale: { type: string }
+                remediation: { type: string }
+                status: { type: string, enum: [edited, approved, rejected] }
+      responses:
+        '200':
+          description: Updated (audited)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recommendation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ---- Rules (database-driven, editable without deploy) ---------------------
+  /rules:
+    get:
+      tags: [Rules]
+      summary: List rules in the active ruleset
+      x-rbac: [admin, consultant]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Rule' }
+    post:
+      tags: [Rules]
+      summary: Create a rule (no deployment required; audited)
+      x-rbac: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RuleInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rule' }
+        '422':
+          description: Invalid condition tree (rejected by the safe-expression validator)
+
+  # ---- Reports --------------------------------------------------------------
+  /assessments/{id}/report:
+    post:
+      tags: [Reports]
+      summary: Generate & publish a report (HTML→PDF via Playwright)
+      x-rbac: [consultant, admin]
+      description: Requires approved recommendations. Renders async; PDF stored in object storage.
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '202': { description: Accepted; rendering }
+        '409': { description: Recommendations not all approved }
+
+  /reports/{id}:
+    get:
+      tags: [Reports]
+      summary: Get a report (metadata + short-lived pre-signed PDF URL)
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Report' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ---- Evaluation -----------------------------------------------------------
+  /evaluation/runs:
+    post:
+      tags: [Evaluation]
+      summary: Trigger an evaluation run (dataset × prompt version × model version)
+      x-rbac: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [datasetId, promptVersionId, modelVersionId]
+              properties:
+                datasetId: { type: string, format: uuid }
+                promptVersionId: { type: string, format: uuid }
+                modelVersionId: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Run started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvaluationRun' }
+    get:
+      tags: [Evaluation]
+      summary: List runs (for regression comparison)
+      x-rbac: [admin]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EvaluationRun' }
+
+  # ---- Admin ----------------------------------------------------------------
+  /admin/metrics:
+    get:
+      tags: [Admin]
+      summary: System metrics (orgs, assessments, reports, AI usage, eval, health)
+      x-rbac: [admin]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminMetrics' }
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: httpOnly, Secure, SameSite session cookie issued by the auth library.
+
+  parameters:
+    Id:        { name: id,    in: path,  required: true, schema: { type: string, format: uuid } }
+    OrgId:     { name: orgId, in: path,  required: true, schema: { type: string, format: uuid } }
+    Status:    { name: status, in: query, required: false, schema: { type: string } }
+    Limit:     { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    Cursor:    { name: cursor, in: query, required: false, schema: { type: string } }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string }
+
+  responses:
+    BadRequest:   { description: Bad request,   content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: Unauthorized,   content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden:    { description: Forbidden,      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound:     { description: Not found,      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict:     { description: Conflict,       content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Validation:   { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    RateLimited:  { description: Too many requests, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  schemas:
+    Error:
+      type: object
+      description: Sanitized error. Never contains stack traces or internal detail.
+      required: [code, message, correlationId]
+      properties:
+        code: { type: string, example: forbidden }
+        message: { type: string, example: You do not have access to this resource. }
+        correlationId: { type: string, example: 7f3c1e2a-... }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 12, writeOnly: true }
+        displayName: { type: string, maxLength: 120 }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, writeOnly: true }
+
+    Principal:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        roles: { type: array, items: { type: string, enum: [admin, consultant, org_user] } }
+        organizations:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              role: { type: string }
+
+    Organization:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    Assessment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        templateId: { type: string, format: uuid }
+        category:
+          type: string
+          enum: [ai_readiness, data_maturity, security, governance, compliance, operations, infrastructure]
+        status:
+          type: string
+          enum: [in_progress, completed, evaluating, reviewed, archived]
+        completedAt: { type: string, format: date-time, nullable: true }
+
+    AssessmentPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Assessment' } }
+        nextCursor: { type: string, nullable: true }
+
+    ResponseInput:
+      type: object
+      required: [questionId, value]
+      properties:
+        questionId: { type: string, format: uuid }
+        value:
+          description: Shape validated server-side against the question type.
+          oneOf:
+            - { type: string }
+            - { type: number }
+            - { type: array, items: { type: string } }
+            - { type: object }
+
+    Recommendation:
+      type: object
+      description: Deterministic finding + optional LLM narrative + provenance.
+      properties:
+        id: { type: string, format: uuid }
+        ruleId: { type: string, format: uuid, nullable: true, description: Source rule (traceability) }
+        category: { type: string }
+        severity: { type: string, enum: [info, low, medium, high, critical] }
+        title: { type: string }
+        finding: { type: string, description: Deterministic (source of truth) }
+        rationale: { type: string, nullable: true, description: LLM-enhanced }
+        remediation: { type: string, nullable: true, description: LLM-enhanced }
+        status: { type: string, enum: [draft, edited, approved, rejected] }
+        provenance:
+          type: object
+          properties:
+            promptVersionId: { type: string, format: uuid, nullable: true }
+            modelVersionId: { type: string, format: uuid, nullable: true }
+            groundingPassed: { type: boolean, nullable: true }
+
+    Rule:
+      allOf:
+        - $ref: '#/components/schemas/RuleInput'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            rulesetId: { type: string, format: uuid }
+
+    RuleInput:
+      type: object
+      required: [code, category, severity, condition, recommendationTemplate]
+      properties:
+        code: { type: string, example: SEC-MFA-001 }
+        category: { type: string }
+        severity: { type: string, enum: [info, low, medium, high, critical] }
+        condition:
+          type: object
+          description: Safe boolean expression tree (no executable code). Validated on write.
+          example:
+            op: and
+            args:
+              - { op: eq, key: mfa_enabled, value: false }
+              - { op: eq, key: sensitive_data_present, value: true }
+        recommendationTemplate:
+          type: object
+          properties:
+            title: { type: string, example: Enforce multi-factor authentication }
+            body: { type: string }
+            references: { type: array, items: { type: string } }
+        priority: { type: integer, default: 100 }
+        isActive: { type: boolean, default: true }
+
+    Report:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        status: { type: string, enum: [draft, published] }
+        pdfUrl: { type: string, nullable: true, description: Short-lived pre-signed URL }
+        publishedAt: { type: string, format: date-time, nullable: true }
+
+    EvaluationRun:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        datasetId: { type: string, format: uuid }
+        promptVersionId: { type: string, format: uuid }
+        modelVersionId: { type: string, format: uuid }
+        status: { type: string, enum: [running, completed, failed] }
+        accuracy: { type: number, nullable: true }
+        consistency: { type: number, nullable: true }
+        completeness: { type: number, nullable: true }
+        hallucinationRate: { type: number, nullable: true }
+
+    AdminMetrics:
+      type: object
+      properties:
+        organizations: { type: integer }
+        assessments: { type: integer }
+        reports: { type: integer }
+        aiUsage:
+          type: object
+          properties:
+            calls: { type: integer }
+            inputTokens: { type: integer }
+            outputTokens: { type: integer }
+            estimatedCost: { type: number }
+        evaluation:
+          type: object
+          properties:
+            latestAccuracy: { type: number }
+            latestHallucinationRate: { type: number }
+        systemHealth:
+          type: object
+          properties:
+            apiLatencyP95Ms: { type: number }
+            llmLatencyP95Ms: { type: number }
+            queueDepth: { type: integer }
