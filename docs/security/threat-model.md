@@ -66,7 +66,7 @@ The browser, uploaded files, assessment free-text, and the LLM/OpenRouter are al
 
 | Threat | Mitigation |
 |---|---|
-| **Cross-tenant data access** (IDOR, broken object-level authz) | Defense in depth: tenant context from session + central repository scoping + **Postgres RLS**. Mandatory cross-tenant test suite (ADR-0006). |
+| **Cross-tenant data access** (IDOR, broken object-level authz) | Defense in depth: tenant context from session + central repository scoping + **Postgres RLS (implemented, enforced via a non-superuser `app_role`)**. Mandatory cross-tenant test suite (ADR-0006). |
 | Stack traces / internal errors leaking schema or paths | Global error handler returns generic message + correlation id; details to logs only. |
 | Direct object reference to documents/reports | No public paths; access via short-lived pre-signed URLs **after** authorization; storage keys opaque. |
 | **Prompt-injection-driven data exfiltration** (malicious assessment text instructs the LLM to leak) | Prompts contain only the current assessment's findings — **no secrets, no cross-tenant data** is ever in context, so there is nothing to exfiltrate. Single monitored egress. Output is data, not actions. |
@@ -88,7 +88,7 @@ The browser, uploaded files, assessment free-text, and the LLM/OpenRouter are al
 |---|---|
 | Org user acting as consultant/admin | Default-deny RBAC; role from session; per-route guards; CI asserts every route is guarded (ADR-0007). |
 | Horizontal escalation across orgs | Same as cross-tenant (Information disclosure) — both-must-pass role + tenant checks. |
-| **Malicious file upload → code execution** | Extension+MIME validation, size limits, **malware scan gate** (`scan_status` must be `clean` before use), files never executed/rendered in a trusted context, stored outside web roots. |
+| **Malicious file upload → code execution** | **Implemented:** extension + MIME + magic-byte validation (spoofed/renamed files rejected), size limits, the **malware-scan gate** (`scan_status` must be `clean` before download), opaque keys outside web roots, content never executed/rendered in a trusted context. |
 | **Stored XSS via LLM or user text in the report → PDF** | Report content is treated as untrusted data; HTML is escaped/sanitized before render; Playwright renders in an isolated, network-restricted context; strict CSP on the web app. |
 | SSRF via OpenRouter/storage/document fetch | No user-controlled outbound URLs; egress allowlist (OpenRouter, storage); document fetching is by internal storage key, not URL. |
 

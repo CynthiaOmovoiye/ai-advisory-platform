@@ -58,7 +58,14 @@ The highest-severity control. See [ADR-0006](../adr/0006-multi-tenancy-isolation
 - `organization_id` on every tenant-owned table; tenant context derived from the
   principal.
 - Repository-layer scoping applied centrally (devs don't hand-write tenant filters).
-- **PostgreSQL Row-Level Security** as an independent backstop.
+- **PostgreSQL Row-Level Security — implemented** (migration `0009`) as the independent
+  second layer: `FORCE`d policies on every org-owned table compare each row's
+  `organization_id` to a transaction-local `app.current_org` the request guard sets
+  from the verified session. **The application connects as a dedicated non-superuser
+  role** (`app_role`, migration `0010`) — superusers/owners bypass RLS, so this detail
+  is what makes the layer real. Verified: a query with *no* application `WHERE` filter
+  returns only the caller's org, and nothing when scope is unset (fail-closed). An
+  audited `app.bypass_rls` flag permits admin cross-org aggregation.
 - Mandatory test suite: for every tenant-owned resource, assert tenant A cannot read,
   list, mutate, or enumerate tenant B's data through any endpoint.
 
@@ -79,18 +86,21 @@ The highest-severity control. See [ADR-0006](../adr/0006-multi-tenancy-isolation
 
 ---
 
-## 5. File upload security
+## 5. File upload security  *(implemented — `app/domain/uploads.py`, migration `0008`)*
 
 PDF and DOCX only. See threat model (malicious upload).
 
-- **Validate extension *and* sniffed MIME type** server-side; reject on mismatch.
-  Never trust the client-supplied content type.
+- **Validate extension, declared MIME type, AND magic bytes** server-side; reject on
+  any mismatch — so a renamed/content-type-spoofed file is refused (verified: an HTML
+  payload named `.pdf`, and a `.exe`, both rejected with 422). The stored MIME is the
+  canonical one for the extension, not the client's claim.
 - **Size limits** enforced before and during streaming to storage.
 - Stored in object storage (MinIO/S3) under opaque keys, **outside any public path**;
   served only via short-lived pre-signed URLs after authorization.
-- **Malware-scan integration point**: a document is `scan_status = pending` on upload
-  and is **never servable or processed until `clean`**. The scanner (e.g. ClamAV/
-  vendor) is a designed seam in the worker pipeline.
+- **Malware-scan gate — implemented**: a document is `scan_status = pending` on upload
+  and is **never downloadable until a worker scan marks it `clean`** (download returns
+  409 otherwise; verified live). The scan runs as a Celery task off the request path;
+  the scanner itself is a stub with an obvious ClamAV/vendor integration point.
 - Filenames are sanitized; content is never rendered inline in a trusted context.
 
 ---
