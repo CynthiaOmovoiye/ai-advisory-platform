@@ -18,10 +18,12 @@ from app.api.deps import (
     get_report_service,
     get_storage,
 )
+from app.domain.access import Principal, Role
 from app.infra.auth import CallerContext
 from app.infra.db import Base, make_session_factory
 from app.infra.storage import InMemoryStorage
-from app.domain.access import Principal, Role
+from app.reports.renderer import FakeRenderer
+from app.reports.service import ReportService
 from app.repositories.orm import Assessment, Organization, Response
 from app.repositories.sql import (
     SqlAssessmentRepository,
@@ -29,10 +31,6 @@ from app.repositories.sql import (
     SqlRecommendationRepository,
     SqlReportRepository,
 )
-from app.reports.renderer import FakeRenderer
-from app.reports.service import ReportService
-
-from tests.conftest import load_baseline_ruleset
 
 ORG = "org-a"
 
@@ -97,12 +95,28 @@ class TestWorkspaceApi(unittest.TestCase):
     def _seed(self):
         s = self.SessionFactory()
         s.add(Organization(id=ORG, name="A", slug="a"))
-        s.add(Assessment(id="assess-a", organization_id=ORG, template_name="AI Readiness",
-                         ruleset_name="baseline", ruleset_version=1))
-        s.add_all([
-            Response(id="r1", assessment_id="assess-a", question_key="mfa_enabled", value=False),
-            Response(id="r2", assessment_id="assess-a", question_key="sensitive_data_present", value=True),
-        ])
+        s.add(
+            Assessment(
+                id="assess-a",
+                organization_id=ORG,
+                template_name="AI Readiness",
+                ruleset_name="baseline",
+                ruleset_version=1,
+            )
+        )
+        s.add_all(
+            [
+                Response(
+                    id="r1", assessment_id="assess-a", question_key="mfa_enabled", value=False
+                ),
+                Response(
+                    id="r2",
+                    assessment_id="assess-a",
+                    question_key="sensitive_data_present",
+                    value=True,
+                ),
+            ]
+        )
         s.commit()
         s.close()
 
@@ -125,13 +139,17 @@ class TestWorkspaceApi(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409)
 
         # 3) consultant edits one and approves all
-        edit = self.client.patch(f"/v1/recommendations/{ids[0]}",
-                                 json={"rationale": "sharper rationale", "status": "approved"})
+        edit = self.client.patch(
+            f"/v1/recommendations/{ids[0]}",
+            json={"rationale": "sharper rationale", "status": "approved"},
+        )
         self.assertEqual(edit.status_code, 200)
         self.assertEqual(edit.json()["status"], "approved")
         for rid in ids[1:]:
             self.assertEqual(
-                self.client.patch(f"/v1/recommendations/{rid}", json={"status": "approved"}).status_code,
+                self.client.patch(
+                    f"/v1/recommendations/{rid}", json={"status": "approved"}
+                ).status_code,
                 200,
             )
 

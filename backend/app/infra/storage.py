@@ -41,7 +41,15 @@ class S3Storage:
     Bucket is private; access is only ever via :meth:`presigned_url`.
     """
 
-    def __init__(self, *, endpoint: str, bucket: str, access_key: str, secret_key: str, region: str = "us-east-1") -> None:
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        bucket: str,
+        access_key: str,
+        secret_key: str,
+        region: str = "us-east-1",
+    ) -> None:
         self._bucket = bucket
         self._endpoint = endpoint
         self._access_key = access_key

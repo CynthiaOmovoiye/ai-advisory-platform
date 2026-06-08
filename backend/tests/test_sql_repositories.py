@@ -23,25 +23,47 @@ from app.repositories.sql import (
     SqlRecommendationRepository,
 )
 from app.services.assessment_service import AssessmentService
-
 from tests.conftest import load_baseline_ruleset
 
 ORG_A, ORG_B = "org-a", "org-b"
 
 
 def _seed(session):
-    session.add_all([Organization(id=ORG_A, name="A", slug="a"),
-                     Organization(id=ORG_B, name="B", slug="b")])
-    session.add(Assessment(id="assess-a", organization_id=ORG_A, template_name="ai_readiness",
-                           ruleset_name="baseline", ruleset_version=1))
-    session.add_all([
-        Response(id="r1", assessment_id="assess-a", question_key="mfa_enabled", value=False),
-        Response(id="r2", assessment_id="assess-a", question_key="sensitive_data_present", value=True),
-        Response(id="r3", assessment_id="assess-a", question_key="ai_governance_owner", value="none"),
-        Response(id="r4", assessment_id="assess-a", question_key="model_monitoring", value="datadog"),
-    ])
-    session.add(Assessment(id="assess-b", organization_id=ORG_B, template_name="ai_readiness",
-                           ruleset_name="baseline", ruleset_version=1))
+    session.add_all(
+        [Organization(id=ORG_A, name="A", slug="a"), Organization(id=ORG_B, name="B", slug="b")]
+    )
+    session.add(
+        Assessment(
+            id="assess-a",
+            organization_id=ORG_A,
+            template_name="ai_readiness",
+            ruleset_name="baseline",
+            ruleset_version=1,
+        )
+    )
+    session.add_all(
+        [
+            Response(id="r1", assessment_id="assess-a", question_key="mfa_enabled", value=False),
+            Response(
+                id="r2", assessment_id="assess-a", question_key="sensitive_data_present", value=True
+            ),
+            Response(
+                id="r3", assessment_id="assess-a", question_key="ai_governance_owner", value="none"
+            ),
+            Response(
+                id="r4", assessment_id="assess-a", question_key="model_monitoring", value="datadog"
+            ),
+        ]
+    )
+    session.add(
+        Assessment(
+            id="assess-b",
+            organization_id=ORG_B,
+            template_name="ai_readiness",
+            ruleset_name="baseline",
+            ruleset_version=1,
+        )
+    )
     session.commit()
 
 
@@ -87,7 +109,9 @@ class TestSqlRepositories(unittest.TestCase):
         self.session.commit()
 
         codes = {r.rule_code for r in recs}
-        self.assertEqual(codes, {"SEC-MFA-001", "GOV-OWN-002"})  # monitoring present -> no OPS finding
+        self.assertEqual(
+            codes, {"SEC-MFA-001", "GOV-OWN-002"}
+        )  # monitoring present -> no OPS finding
         self.assertTrue(all(r.source == "llm" and r.grounding_passed for r in recs))
 
         # persisted + readable back through the scoped repository

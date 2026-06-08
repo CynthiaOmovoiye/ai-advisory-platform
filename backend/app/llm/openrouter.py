@@ -25,9 +25,10 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Protocol
 
 from app.domain.grounding import Enhancement
 from app.domain.rules.models import Finding
@@ -80,10 +81,10 @@ class LLMCall:
     model_id: str
     status: str  # "success" | "timeout" | "error"
     latency_ms: int
-    input_tokens: Optional[int] = None
-    output_tokens: Optional[int] = None
-    cost_estimate: Optional[Decimal] = None
-    correlation_id: Optional[str] = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cost_estimate: Decimal | None = None
+    correlation_id: str | None = None
 
 
 class TelemetrySink(Protocol):
@@ -178,10 +179,10 @@ class OpenRouterProvider:
         config: OpenRouterConfig,
         pricing: ModelPricing,
         *,
-        client: Optional[Any] = None,  # httpx.Client; injected in tests
-        telemetry: Optional[TelemetrySink] = None,
+        client: Any | None = None,  # httpx.Client; injected in tests
+        telemetry: TelemetrySink | None = None,
         sleeper: Callable[[float], None] = time.sleep,
-        correlation_id: Optional[str] = None,
+        correlation_id: str | None = None,
     ) -> None:
         self._config = config
         self._pricing = pricing
@@ -217,7 +218,7 @@ class OpenRouterProvider:
         }
 
         start = time.perf_counter()
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
         for attempt in range(self._config.max_retries + 1):
             try:
                 response = self._client.post("/chat/completions", json=body)
@@ -271,9 +272,9 @@ class OpenRouterProvider:
         start: float,
         *,
         status: str,
-        input_tokens: Optional[int] = None,
-        output_tokens: Optional[int] = None,
-        cost: Optional[Decimal] = None,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        cost: Decimal | None = None,
     ) -> None:
         self._telemetry.record(
             LLMCall(

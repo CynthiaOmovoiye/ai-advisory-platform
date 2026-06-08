@@ -4,7 +4,6 @@ import unittest
 
 from app.eval import metrics, runner
 from app.llm.mock import FabricatingLLMProvider, MockLLMProvider
-
 from tests.conftest import load_baseline_dataset, load_baseline_ruleset
 
 
@@ -32,9 +31,9 @@ class TestRunner(unittest.TestCase):
 
     def test_clean_run_passes_the_gate(self):
         result = runner.run(self.dataset, self.ruleset, MockLLMProvider())
-        self.assertEqual(result.accuracy, 1.0)          # engine reproduces gold findings
+        self.assertEqual(result.accuracy, 1.0)  # engine reproduces gold findings
         self.assertEqual(result.hallucination_rate, 0.0)  # nothing ungrounded slipped through
-        self.assertEqual(result.consistency, 1.0)        # deterministic
+        self.assertEqual(result.consistency, 1.0)  # deterministic
         self.assertTrue(result.passed)
 
     def test_hallucinating_model_fails_the_gate(self):

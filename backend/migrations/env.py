@@ -16,8 +16,8 @@ import os
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from app.infra.db import Base
 import app.repositories.orm  # noqa: F401  (registers models on Base.metadata)
+from app.infra.db import Base
 
 config = context.config
 

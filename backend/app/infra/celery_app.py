@@ -18,7 +18,7 @@ _backend = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/2")
 
 celery_app = Celery("advisory", broker=_broker, backend=_backend)
 celery_app.conf.update(
-    task_acks_late=True,            # don't lose a job if a worker dies mid-render
+    task_acks_late=True,  # don't lose a job if a worker dies mid-render
     task_reject_on_worker_lost=True,
     task_track_started=True,
     worker_prefetch_multiplier=1,  # fair dispatch for slow PDF/LLM tasks

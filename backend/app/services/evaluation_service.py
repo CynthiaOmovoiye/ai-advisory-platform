@@ -11,8 +11,9 @@ pass/fail gate, and stores the result.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Protocol, Sequence
+from typing import Protocol
 
 from app.domain.rules.models import Ruleset
 from app.eval import runner
@@ -32,7 +33,7 @@ class EvaluationRunRecord:
     completeness: float
     hallucination_rate: float
     item_count: int
-    triggered_by: Optional[str]
+    triggered_by: str | None
 
 
 class EvaluationRunRepository(Protocol):
@@ -52,7 +53,7 @@ class EvaluationService:
         dataset: Sequence[dict],
         *,
         model_id: str,
-        triggered_by: Optional[str],
+        triggered_by: str | None,
     ) -> EvaluationRunRecord:
         result: RunResult = runner.run(dataset, self.ruleset, self.llm)
         record = EvaluationRunRecord(

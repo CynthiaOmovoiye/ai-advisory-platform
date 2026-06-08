@@ -5,7 +5,6 @@ import unittest
 
 from app.domain.rules import engine
 from app.domain.rules.models import Severity
-
 from tests.conftest import load_baseline_ruleset
 
 
@@ -25,7 +24,14 @@ class TestEngine(unittest.TestCase):
         codes = [f.rule_code for f in engine.evaluate(self.ruleset, facts)]
         self.assertEqual(
             set(codes),
-            {"COMP-PII-004", "SEC-MFA-001", "GOV-OWN-002", "DATA-QLT-003", "OPS-OBS-005", "INF-VEC-006"},
+            {
+                "COMP-PII-004",
+                "SEC-MFA-001",
+                "GOV-OWN-002",
+                "DATA-QLT-003",
+                "OPS-OBS-005",
+                "INF-VEC-006",
+            },
         )
 
     def test_clean_org_produces_no_findings(self):
@@ -73,7 +79,9 @@ class TestEngine(unittest.TestCase):
         # literal text, never interpreted. (We substitute manually, not via .format.)
         from app.domain.rules.engine import render_template
 
-        out = render_template("score is {data_quality_score}", {"data_quality_score": "{0.__class__}"})
+        out = render_template(
+            "score is {data_quality_score}", {"data_quality_score": "{0.__class__}"}
+        )
         self.assertEqual(out, "score is {0.__class__}")
 
 

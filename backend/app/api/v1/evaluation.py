@@ -25,7 +25,9 @@ from app.services.evaluation_service import EvaluationService
 router = APIRouter(tags=["Evaluation"])
 
 
-@router.post("/evaluation/runs", status_code=status.HTTP_201_CREATED, response_model=EvaluationRunOut)
+@router.post(
+    "/evaluation/runs", status_code=status.HTTP_201_CREATED, response_model=EvaluationRunOut
+)
 def trigger_run(
     body: TriggerEvaluationRequest,
     _scope=Depends(require(Permission.ADMIN_METRICS)),

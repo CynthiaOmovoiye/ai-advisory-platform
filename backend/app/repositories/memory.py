@@ -11,7 +11,6 @@ other tenant's data.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Optional
 
 from app.llm.enhancement import Recommendation
 
@@ -27,10 +26,10 @@ __all__ = [
 
 
 class InMemoryAssessmentRepository:
-    def __init__(self, records: Optional[list[AssessmentRecord]] = None) -> None:
+    def __init__(self, records: list[AssessmentRecord] | None = None) -> None:
         self._by_id: dict[str, AssessmentRecord] = {r.id: r for r in (records or [])}
 
-    def get(self, assessment_id: str, scope: TenantScope) -> Optional[AssessmentRecord]:
+    def get(self, assessment_id: str, scope: TenantScope) -> AssessmentRecord | None:
         """Tenant-scoped fetch. A row outside the scope is invisible — returns None,
         exactly as a `WHERE organization_id = scope` query (or RLS) would."""
         record = self._by_id.get(assessment_id)
@@ -67,7 +66,7 @@ class InMemoryRecommendationRepository:
     def list_for_assessment(self, assessment_id: str, scope: TenantScope) -> list[Recommendation]:
         return list(self._by_org.get(scope.organization_id, {}).get(assessment_id, []))
 
-    def get(self, recommendation_id: str, scope: TenantScope) -> Optional[Recommendation]:
+    def get(self, recommendation_id: str, scope: TenantScope) -> Recommendation | None:
         for recs in self._by_org.get(scope.organization_id, {}).values():
             for r in recs:
                 if r.id == recommendation_id:
@@ -90,7 +89,7 @@ class InMemoryReportRepository:
     def save(self, report: ReportRecord, scope: TenantScope) -> None:
         self._by_org.setdefault(scope.organization_id, {})[report.assessment_id] = report
 
-    def get_for_assessment(self, assessment_id: str, scope: TenantScope) -> Optional[ReportRecord]:
+    def get_for_assessment(self, assessment_id: str, scope: TenantScope) -> ReportRecord | None:
         return self._by_org.get(scope.organization_id, {}).get(assessment_id)
 
 
@@ -101,7 +100,9 @@ class AuditLog:
 
     entries: list[dict] = field(default_factory=list)
 
-    def record(self, *, actor_user_id: str, organization_id: str, action: str, entity_id: str) -> None:
+    def record(
+        self, *, actor_user_id: str, organization_id: str, action: str, entity_id: str
+    ) -> None:
         self.entries.append(
             {
                 "actor_user_id": actor_user_id,

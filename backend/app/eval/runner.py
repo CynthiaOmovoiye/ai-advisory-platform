@@ -13,8 +13,9 @@ A dataset item (mirrors ``evaluation_dataset_items`` in db/schema.sql)::
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from app.domain.rules import engine
 from app.domain.rules.models import Ruleset
@@ -64,7 +65,10 @@ def run(
         expected = item["expected"]["finding_codes"]
 
         # Run the engine multiple times to measure consistency.
-        runs = [[f.rule_code for f in engine.evaluate(ruleset, facts)] for _ in range(consistency_repeats)]
+        runs = [
+            [f.rule_code for f in engine.evaluate(ruleset, facts)]
+            for _ in range(consistency_repeats)
+        ]
         produced = runs[0]
 
         recs = enhance_findings(engine.evaluate(ruleset, facts), provider)

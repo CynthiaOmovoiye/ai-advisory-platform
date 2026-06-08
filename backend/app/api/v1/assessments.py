@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import CallerContext, get_caller, get_db, get_assessment_service, require
+from app.api.deps import CallerContext, get_assessment_service, get_caller, get_db, require
 from app.domain.access import Permission
 from app.schemas.recommendation import CompleteAssessmentResponse, RecommendationOut
 from app.services.assessment_service import AssessmentService

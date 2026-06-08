@@ -16,9 +16,17 @@ ORG = "org-a"
 
 def _rec(code="SEC-MFA-001"):
     return Recommendation(
-        finding_id=code, rule_code=code, category="security", severity=Severity.HIGH,
-        title="Enforce MFA", finding="MFA off", rationale="r", remediation="m",
-        source="llm", grounding_passed=True, status="draft",
+        finding_id=code,
+        rule_code=code,
+        category="security",
+        severity=Severity.HIGH,
+        title="Enforce MFA",
+        finding="MFA off",
+        rationale="r",
+        remediation="m",
+        source="llm",
+        grounding_passed=True,
+        status="draft",
     )
 
 
@@ -32,7 +40,7 @@ class TestRecommendationService(unittest.TestCase):
         self.audit = AuditLog()
         self.scope = TenantScope(ORG, "c1")
         self.repo.save_for_assessment("a1", [_rec()], self.scope)
-        self.rec_id = f"a1:SEC-MFA-001"
+        self.rec_id = "a1:SEC-MFA-001"
         self.svc = RecommendationService(recommendations=self.repo, audit=self.audit)
 
     def test_edit_updates_narrative_and_marks_edited(self):

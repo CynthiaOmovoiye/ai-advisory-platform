@@ -47,7 +47,10 @@ def main() -> None:
     print("=" * 78)
     recs = enhance_findings(findings, MockLLMProvider())
     top = recs[0]
-    print(f"  {top.rule_code} — {top.title}  (source={top.source}, grounding_passed={top.grounding_passed})")
+    print(
+        f"  {top.rule_code} — {top.title}  "
+        f"(source={top.source}, grounding_passed={top.grounding_passed})"
+    )
     print(f"    finding    : {top.finding}")
     print(f"    rationale  : {top.rationale}")
     print(f"    remediation: {top.remediation}")

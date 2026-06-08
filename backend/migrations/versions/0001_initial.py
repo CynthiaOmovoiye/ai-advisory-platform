@@ -9,7 +9,7 @@ is db/schema.sql; this migration covers the subset the running application maps 
 SQLAlchemy. JSONB on Postgres, JSON elsewhere (ADR-0008).
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -17,9 +17,9 @@ from alembic import op
 from app.infra.db import JSONType
 
 revision: str = "0001_initial"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -32,7 +32,12 @@ def upgrade() -> None:
     op.create_table(
         "assessments",
         sa.Column("id", sa.String(), primary_key=True),
-        sa.Column("organization_id", sa.String(), sa.ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "organization_id",
+            sa.String(),
+            sa.ForeignKey("organizations.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("template_name", sa.String(), nullable=False),
         sa.Column("ruleset_name", sa.String(), nullable=False),
         sa.Column("ruleset_version", sa.Integer(), nullable=False, server_default="1"),
@@ -42,7 +47,12 @@ def upgrade() -> None:
     op.create_table(
         "responses",
         sa.Column("id", sa.String(), primary_key=True),
-        sa.Column("assessment_id", sa.String(), sa.ForeignKey("assessments.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "assessment_id",
+            sa.String(),
+            sa.ForeignKey("assessments.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("question_key", sa.String(), nullable=False),
         sa.Column("value", JSONType, nullable=False),
     )
@@ -50,8 +60,18 @@ def upgrade() -> None:
     op.create_table(
         "recommendations",
         sa.Column("id", sa.String(), primary_key=True),
-        sa.Column("organization_id", sa.String(), sa.ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("assessment_id", sa.String(), sa.ForeignKey("assessments.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "organization_id",
+            sa.String(),
+            sa.ForeignKey("organizations.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "assessment_id",
+            sa.String(),
+            sa.ForeignKey("assessments.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("rule_code", sa.String(), nullable=False),
         sa.Column("category", sa.String(), nullable=False),
         sa.Column("severity", sa.String(), nullable=False),

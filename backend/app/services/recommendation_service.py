@@ -14,7 +14,6 @@ preserved (ADR-0003).
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Optional
 
 from app.domain.access import Permission, Principal, authorize
 from app.errors import AppError, NotFound
@@ -41,10 +40,10 @@ class RecommendationService:
         organization_id: str,
         recommendation_id: str,
         *,
-        title: Optional[str] = None,
-        finding: Optional[str] = None,
-        rationale: Optional[str] = None,
-        remediation: Optional[str] = None,
+        title: str | None = None,
+        finding: str | None = None,
+        rationale: str | None = None,
+        remediation: str | None = None,
     ) -> Recommendation:
         authorize(principal, Permission.RECOMMENDATION_EDIT, organization_id)
         scope = TenantScope(organization_id=organization_id, acting_user_id=principal.user_id)

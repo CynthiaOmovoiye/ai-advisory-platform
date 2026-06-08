@@ -9,9 +9,10 @@ with. Field names mirror db/schema.sql.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .conditions import validate_condition
 
@@ -39,7 +40,7 @@ class Severity(IntEnum):
     CRITICAL = 4
 
     @classmethod
-    def parse(cls, value: str) -> "Severity":
+    def parse(cls, value: str) -> Severity:
         try:
             return cls[value.upper()]
         except KeyError as exc:  # pragma: no cover - guarded by validation
@@ -54,7 +55,7 @@ class Rule:
     category: str
     severity: Severity
     condition: Mapping[str, Any]
-    template: "RecommendationTemplate"
+    template: RecommendationTemplate
     priority: int = 100
     is_active: bool = True
 

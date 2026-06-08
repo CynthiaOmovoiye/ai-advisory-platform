@@ -24,10 +24,10 @@ from app.api.deps import (
 from app.domain.access import Permission
 from app.errors import NotFound
 from app.infra.storage import ObjectStorage
+from app.reports.service import ReportService
 from app.repositories.base import TenantScope
 from app.repositories.sql import SqlReportRepository
 from app.schemas.report import ReportOut
-from app.reports.service import ReportService
 
 router = APIRouter(tags=["Reports"])
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel
 
 from app.services.evaluation_service import EvaluationRunRecord
@@ -19,7 +17,7 @@ class AdminMetricsOut(BaseModel):
     evaluation: dict[str, object]
 
     @classmethod
-    def from_domain(cls, m: AdminMetrics) -> "AdminMetricsOut":
+    def from_domain(cls, m: AdminMetrics) -> AdminMetricsOut:
         return cls(
             organizations=m.organizations,
             assessments_total=m.assessments_total,
@@ -43,7 +41,7 @@ class EvaluationRunOut(BaseModel):
     item_count: int
 
     @classmethod
-    def from_domain(cls, r: EvaluationRunRecord) -> "EvaluationRunOut":
+    def from_domain(cls, r: EvaluationRunRecord) -> EvaluationRunOut:
         return cls(
             id=r.id,
             dataset_name=r.dataset_name,
@@ -59,4 +57,4 @@ class EvaluationRunOut(BaseModel):
 
 
 class TriggerEvaluationRequest(BaseModel):
-    dataset_name: Optional[str] = "baseline-readiness"
+    dataset_name: str | None = "baseline-readiness"

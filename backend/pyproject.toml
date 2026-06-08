@@ -13,13 +13,14 @@ dependencies = [
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "httpx>=0.27",            # OpenRouter client
+    "pyjwt>=2.8",             # BFF session-token verification (ADR-0009)
     "uvicorn>=0.30",
-    # added when the worker/cache phases land:
-    # "celery>=5.4", "redis>=5.0", "psycopg[binary]>=3.1",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5", "black>=24.4", "mypy>=1.10"]
+# Worker tier — Celery + Redis + Playwright for report rendering:
+worker = ["celery>=5.4", "redis>=5.0", "playwright>=1.40"]
 # Postgres driver for running against a real database (tests use SQLite):
 postgres = ["psycopg[binary]>=3.1"]
 
@@ -33,7 +34,14 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "S"]   # incl. bugbear + bandit security lints
-ignore = ["S101"]                          # asserts are fine in tests
+ignore = [
+    "S101",   # asserts are fine (tests, and our internal invariants)
+    "B008",   # function-call-in-default — this IS the FastAPI Depends() idiom
+    "UP042",  # `class X(str, Enum)` is intentional (JSON-serializable role/severity)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106"]   # hard-coded test secrets/tokens are expected in tests
 
 [tool.black]
 line-length = 100

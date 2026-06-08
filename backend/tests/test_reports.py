@@ -12,6 +12,10 @@ from app.domain.rules.models import Severity
 from app.errors import Conflict, NotFound
 from app.infra.storage import InMemoryStorage
 from app.llm.enhancement import Recommendation
+from app.reports.html import render_report_html
+from app.reports.model import build_report_model
+from app.reports.renderer import FakeRenderer
+from app.reports.service import ReportService
 from app.repositories.base import AssessmentRecord, TenantScope
 from app.repositories.memory import (
     AuditLog,
@@ -19,20 +23,32 @@ from app.repositories.memory import (
     InMemoryRecommendationRepository,
     InMemoryReportRepository,
 )
-from app.reports.html import render_report_html
-from app.reports.model import build_report_model
-from app.reports.renderer import FakeRenderer
-from app.reports.service import ReportService
 
 ORG = "org-a"
 
 
-def _rec(code, category, severity, title="T", finding="F", rationale="R", remediation="M",
-         status="approved"):
+def _rec(
+    code,
+    category,
+    severity,
+    title="T",
+    finding="F",
+    rationale="R",
+    remediation="M",
+    status="approved",
+):
     return Recommendation(
-        finding_id=code, rule_code=code, category=category, severity=severity,
-        title=title, finding=finding, rationale=rationale, remediation=remediation,
-        source="llm", grounding_passed=True, status=status,
+        finding_id=code,
+        rule_code=code,
+        category=category,
+        severity=severity,
+        title=title,
+        finding=finding,
+        rationale=rationale,
+        remediation=remediation,
+        source="llm",
+        grounding_passed=True,
+        status=status,
     )
 
 
@@ -83,12 +99,28 @@ class TestReportHtml(unittest.TestCase):
 
 class TestReportService(unittest.TestCase):
     def setUp(self):
-        self.assessments = InMemoryAssessmentRepository([
-            AssessmentRecord(id="a1", organization_id=ORG, template_name="AI Readiness",
-                             ruleset_name="baseline", ruleset_version=1, responses=(), status="completed"),
-            AssessmentRecord(id="a2", organization_id=ORG, template_name="AI Readiness",
-                             ruleset_name="baseline", ruleset_version=1, responses=(), status="in_progress"),
-        ])
+        self.assessments = InMemoryAssessmentRepository(
+            [
+                AssessmentRecord(
+                    id="a1",
+                    organization_id=ORG,
+                    template_name="AI Readiness",
+                    ruleset_name="baseline",
+                    ruleset_version=1,
+                    responses=(),
+                    status="completed",
+                ),
+                AssessmentRecord(
+                    id="a2",
+                    organization_id=ORG,
+                    template_name="AI Readiness",
+                    ruleset_name="baseline",
+                    ruleset_version=1,
+                    responses=(),
+                    status="in_progress",
+                ),
+            ]
+        )
         self.recs = InMemoryRecommendationRepository()
         self.reports = InMemoryReportRepository()
         self.audit = AuditLog()
@@ -96,8 +128,12 @@ class TestReportService(unittest.TestCase):
         self.scope = TenantScope(ORG, "consultant-1")
         self.recs.save_for_assessment("a1", RECS, self.scope)
         self.svc = ReportService(
-            assessments=self.assessments, recommendations=self.recs, reports=self.reports,
-            audit=self.audit, storage=self.storage, renderer=FakeRenderer(),
+            assessments=self.assessments,
+            recommendations=self.recs,
+            reports=self.reports,
+            audit=self.audit,
+            storage=self.storage,
+            renderer=FakeRenderer(),
         )
 
     def test_generate_publishes_and_stores_pdf(self):
@@ -133,12 +169,13 @@ class TestReportService(unittest.TestCase):
         ]
         self.recs.save_for_assessment("a1", mixed, self.scope)
         self.svc.generate(self.scope, "a1", organization_name="Acme")
-        html = self.storage.objects[f"reports/{ORG}/a1.pdf"]
-        # FakeRenderer encodes the html length; assert generation succeeded with only
-        # the approved finding (governance section absent) by re-building the model.
+        # generation succeeded; assert only the approved finding shaped the report
+        # (governance section absent) by re-building the model from the approved set.
         from app.reports.model import build_report_model
-        model = build_report_model("Acme", "AI Readiness",
-                                   [r for r in mixed if r.status == "approved"])
+
+        model = build_report_model(
+            "Acme", "AI Readiness", [r for r in mixed if r.status == "approved"]
+        )
         self.assertNotIn("governance", [s.key for s in model.sections])
 
 

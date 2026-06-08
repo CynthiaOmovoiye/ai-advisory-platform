@@ -12,6 +12,8 @@ from app.infra.celery_app import celery_app
 from app.infra.config import get_settings
 from app.infra.db import make_engine, make_session_factory, session_scope
 from app.infra.storage import S3Storage
+from app.reports.renderer import PlaywrightRenderer
+from app.reports.service import ReportService
 from app.repositories.base import TenantScope
 from app.repositories.sql import (
     SqlAssessmentRepository,
@@ -19,8 +21,6 @@ from app.repositories.sql import (
     SqlRecommendationRepository,
     SqlReportRepository,
 )
-from app.reports.renderer import PlaywrightRenderer
-from app.reports.service import ReportService
 
 _engine = None
 _session_factory = None
@@ -42,7 +42,9 @@ def _factory():
     default_retry_delay=10,
     acks_late=True,
 )
-def generate_report(self, *, assessment_id: str, organization_id: str, organization_name: str, actor_user_id: str) -> dict:  # pragma: no cover - requires Redis + browser
+def generate_report(
+    self, *, assessment_id: str, organization_id: str, organization_name: str, actor_user_id: str
+) -> dict:  # pragma: no cover - requires Redis + browser
     """Render and publish a report for a completed assessment.
 
     Idempotent at the storage/report-row level (keyed by assessment), so a retry after
@@ -57,10 +59,11 @@ def generate_report(self, *, assessment_id: str, organization_id: str, organizat
             reports=SqlReportRepository(session),
             audit=SqlAuditSink(session),
             storage=S3Storage(
-                endpoint=settings.__dict__.get("storage_endpoint", "http://localhost:9000"),
-                bucket="advisory-documents",
-                access_key="minioadmin",
-                secret_key="minioadmin",
+                endpoint=settings.storage_endpoint,
+                bucket=settings.storage_bucket,
+                access_key=settings.storage_access_key,
+                secret_key=settings.storage_secret_key,
+                region=settings.storage_region,
             ),
             renderer=PlaywrightRenderer(),
         )

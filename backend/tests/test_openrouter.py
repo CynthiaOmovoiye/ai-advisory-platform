@@ -10,11 +10,11 @@ from decimal import Decimal
 
 from app.domain.rules.models import Finding, Severity
 from app.llm.openrouter import (
+    ListTelemetrySink,
     LLMError,
     ModelPricing,
     OpenRouterConfig,
     OpenRouterProvider,
-    ListTelemetrySink,
     build_messages,
     compute_cost,
     parse_enhancement,
@@ -23,6 +23,7 @@ from app.llm.openrouter import (
 
 try:
     import httpx
+
     HAVE_HTTPX = True
 except ImportError:  # pragma: no cover
     HAVE_HTTPX = False

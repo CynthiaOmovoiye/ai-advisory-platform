@@ -32,9 +32,13 @@ def patch_recommendation(
     result = None
     if any(v is not None for v in (patch.title, patch.finding, patch.rationale, patch.remediation)):
         result = svc.edit(
-            caller.principal, org, recommendation_id,
-            title=patch.title, finding=patch.finding,
-            rationale=patch.rationale, remediation=patch.remediation,
+            caller.principal,
+            org,
+            recommendation_id,
+            title=patch.title,
+            finding=patch.finding,
+            rationale=patch.rationale,
+            remediation=patch.remediation,
         )
     if patch.status is not None:
         result = svc.set_status(caller.principal, org, recommendation_id, patch.status)

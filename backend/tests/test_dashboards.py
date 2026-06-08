@@ -17,7 +17,6 @@ from app.repositories.orm import (
 from app.repositories.sql import SqlEvaluationRunRepository
 from app.services.evaluation_service import EvaluationService
 from app.services.metrics_service import SqlMetricsRepository
-
 from tests.conftest import load_baseline_dataset, load_baseline_ruleset
 
 ORG = "org-a"
@@ -25,9 +24,20 @@ ORG = "org-a"
 
 def _rec(rid, source, grounding, status):
     return RecommendationRow(
-        id=rid, organization_id=ORG, assessment_id="a1", rule_code=rid, category="security",
-        severity="HIGH", title="t", finding="f", rationale="r", remediation="m",
-        source=source, grounding_passed=grounding, grounding_reasons=[], status=status,
+        id=rid,
+        organization_id=ORG,
+        assessment_id="a1",
+        rule_code=rid,
+        category="security",
+        severity="HIGH",
+        title="t",
+        finding="f",
+        rationale="r",
+        remediation="m",
+        source=source,
+        grounding_passed=grounding,
+        grounding_reasons=[],
+        status=status,
     )
 
 
@@ -44,17 +54,43 @@ class TestDashboards(unittest.TestCase):
     def _seed(self):
         s = self.session
         s.add(Organization(id=ORG, name="A", slug="a"))
-        s.add(Assessment(id="a1", organization_id=ORG, template_name="AI Readiness",
-                         ruleset_name="baseline", ruleset_version=1, status="completed"))
-        s.add(Assessment(id="a2", organization_id=ORG, template_name="AI Readiness",
-                         ruleset_name="baseline", ruleset_version=1, status="in_progress"))
-        s.add_all([
-            _rec("r1", "llm", True, "approved"),
-            _rec("r2", "llm", True, "approved"),
-            _rec("r3", "fallback", False, "rejected"),   # ungrounded -> fell back
-        ])
-        s.add(ReportRow(id="rep1", organization_id=ORG, assessment_id="a1",
-                        title="Report", status="published", pdf_storage_key="reports/org-a/a1.pdf"))
+        s.add(
+            Assessment(
+                id="a1",
+                organization_id=ORG,
+                template_name="AI Readiness",
+                ruleset_name="baseline",
+                ruleset_version=1,
+                status="completed",
+            )
+        )
+        s.add(
+            Assessment(
+                id="a2",
+                organization_id=ORG,
+                template_name="AI Readiness",
+                ruleset_name="baseline",
+                ruleset_version=1,
+                status="in_progress",
+            )
+        )
+        s.add_all(
+            [
+                _rec("r1", "llm", True, "approved"),
+                _rec("r2", "llm", True, "approved"),
+                _rec("r3", "fallback", False, "rejected"),  # ungrounded -> fell back
+            ]
+        )
+        s.add(
+            ReportRow(
+                id="rep1",
+                organization_id=ORG,
+                assessment_id="a1",
+                title="Report",
+                status="published",
+                pdf_storage_key="reports/org-a/a1.pdf",
+            )
+        )
         s.commit()
 
     def test_admin_metrics_aggregate(self):
@@ -74,7 +110,9 @@ class TestDashboards(unittest.TestCase):
             ruleset=load_baseline_ruleset(),
             llm=MockLLMProvider(),
         )
-        run = svc.run("baseline-readiness", load_baseline_dataset(), model_id="mock", triggered_by="admin")
+        run = svc.run(
+            "baseline-readiness", load_baseline_dataset(), model_id="mock", triggered_by="admin"
+        )
         self.session.commit()
         self.assertEqual(run.accuracy, 1.0)
         self.assertEqual(run.hallucination_rate, 0.0)

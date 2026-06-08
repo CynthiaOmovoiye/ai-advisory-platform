@@ -8,8 +8,8 @@ fully unit-testable.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 from app.domain.rules.models import Severity
 from app.llm.enhancement import Recommendation
@@ -38,8 +38,11 @@ _SECTION_MAP: list[tuple[str, str, frozenset[str]]] = [
     ("risk", "Risk Analysis", frozenset({"compliance"})),
     ("security", "Security Findings", frozenset({"security"})),
     ("governance", "Governance Findings", frozenset({"governance"})),
-    ("architecture", "Architecture Recommendations",
-     frozenset({"infrastructure", "operations", "data_maturity", "ai_readiness"})),
+    (
+        "architecture",
+        "Architecture Recommendations",
+        frozenset({"infrastructure", "operations", "data_maturity", "ai_readiness"}),
+    ),
 ]
 
 

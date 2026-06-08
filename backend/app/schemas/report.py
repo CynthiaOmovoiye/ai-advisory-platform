@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from pydantic import BaseModel
 
 from app.repositories.base import ReportRecord
@@ -14,10 +12,10 @@ class ReportOut(BaseModel):
     assessment_id: str
     title: str
     status: str
-    pdf_url: Optional[str]  # short-lived pre-signed URL; null until rendered
+    pdf_url: str | None  # short-lived pre-signed URL; null until rendered
 
     @classmethod
-    def from_domain(cls, report: ReportRecord, pdf_url: Optional[str]) -> "ReportOut":
+    def from_domain(cls, report: ReportRecord, pdf_url: str | None) -> ReportOut:
         return cls(
             id=report.id,
             assessment_id=report.assessment_id,

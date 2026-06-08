@@ -78,7 +78,11 @@ def decode_session(token: str, *, secret: str, issuer: str, audience: str) -> Ca
         raise Unauthorized("session missing subject or active organization")
 
     org_roles_raw = claims.get("org_roles") or {}
-    org_roles = {org: _roles(roles) for org, roles in org_roles_raw.items()} if isinstance(org_roles_raw, dict) else {}
+    org_roles = (
+        {org: _roles(roles) for org, roles in org_roles_raw.items()}
+        if isinstance(org_roles_raw, dict)
+        else {}
+    )
 
     principal = Principal(
         user_id=str(user_id),

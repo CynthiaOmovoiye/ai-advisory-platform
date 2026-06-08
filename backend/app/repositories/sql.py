@@ -18,7 +18,6 @@ determinism here we derive recommendation ids from (assessment, rule_code).
 from __future__ import annotations
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -33,7 +32,6 @@ from .orm import (
     EvaluationRunRow,
     RecommendationRow,
     ReportRow,
-    Response,
 )
 
 
@@ -41,7 +39,7 @@ class SqlAssessmentRepository:
     def __init__(self, session: Session) -> None:
         self._s = session
 
-    def get(self, assessment_id: str, scope: TenantScope) -> Optional[AssessmentRecord]:
+    def get(self, assessment_id: str, scope: TenantScope) -> AssessmentRecord | None:
         row = self._s.execute(
             select(Assessment).where(
                 Assessment.id == assessment_id,
@@ -106,7 +104,7 @@ class SqlRecommendationRepository:
             )
         self._s.flush()
 
-    def get(self, recommendation_id: str, scope: TenantScope) -> Optional[Recommendation]:
+    def get(self, recommendation_id: str, scope: TenantScope) -> Recommendation | None:
         row = self._s.execute(
             select(RecommendationRow).where(
                 RecommendationRow.id == recommendation_id,
@@ -133,9 +131,7 @@ class SqlRecommendationRepository:
         self._s.flush()
         return _to_recommendation(row)
 
-    def list_for_assessment(
-        self, assessment_id: str, scope: TenantScope
-    ) -> list[Recommendation]:
+    def list_for_assessment(self, assessment_id: str, scope: TenantScope) -> list[Recommendation]:
         rows = self._s.execute(
             select(RecommendationRow)
             .where(
@@ -164,7 +160,7 @@ class SqlReportRepository:
         row.pdf_storage_key = report.pdf_storage_key
         self._s.flush()
 
-    def get_for_assessment(self, assessment_id: str, scope: TenantScope) -> Optional[ReportRecord]:
+    def get_for_assessment(self, assessment_id: str, scope: TenantScope) -> ReportRecord | None:
         row = self._s.execute(
             select(ReportRow).where(
                 ReportRow.assessment_id == assessment_id,

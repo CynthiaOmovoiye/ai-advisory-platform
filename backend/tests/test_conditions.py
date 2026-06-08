@@ -61,14 +61,19 @@ class TestEvaluation(unittest.TestCase):
         self.assertTrue(evaluate_condition({"op": "eq", "key": "a", "value": True}, facts))
         self.assertTrue(
             evaluate_condition(
-                {"op": "or", "args": [
-                    {"op": "eq", "key": "b", "value": True},
-                    {"op": "eq", "key": "a", "value": True},
-                ]},
+                {
+                    "op": "or",
+                    "args": [
+                        {"op": "eq", "key": "b", "value": True},
+                        {"op": "eq", "key": "a", "value": True},
+                    ],
+                },
                 facts,
             )
         )
-        self.assertTrue(evaluate_condition({"op": "not", "arg": {"op": "eq", "key": "b", "value": True}}, facts))
+        self.assertTrue(
+            evaluate_condition({"op": "not", "arg": {"op": "eq", "key": "b", "value": True}}, facts)
+        )
 
     def test_numeric_comparisons(self):
         facts = {"score": 2}
@@ -77,16 +82,26 @@ class TestEvaluation(unittest.TestCase):
 
     def test_bool_is_not_a_number(self):
         # True must not be treated as 1 in ordering comparisons.
-        self.assertFalse(evaluate_condition({"op": "gt", "key": "flag", "value": 0}, {"flag": True}))
+        self.assertFalse(
+            evaluate_condition({"op": "gt", "key": "flag", "value": 0}, {"flag": True})
+        )
 
     def test_type_mismatch_returns_false_not_error(self):
         # "high" > 3 must not raise — a bad data type just doesn't match.
         self.assertFalse(evaluate_condition({"op": "gt", "key": "x", "value": 3}, {"x": "high"}))
 
     def test_membership(self):
-        self.assertTrue(evaluate_condition({"op": "in", "key": "t", "value": ["a", "b"]}, {"t": "a"}))
-        self.assertTrue(evaluate_condition({"op": "contains", "key": "caps", "value": "rag"}, {"caps": ["rag", "agents"]}))
-        self.assertFalse(evaluate_condition({"op": "contains", "key": "caps", "value": "rag"}, {"caps": 5}))
+        self.assertTrue(
+            evaluate_condition({"op": "in", "key": "t", "value": ["a", "b"]}, {"t": "a"})
+        )
+        self.assertTrue(
+            evaluate_condition(
+                {"op": "contains", "key": "caps", "value": "rag"}, {"caps": ["rag", "agents"]}
+            )
+        )
+        self.assertFalse(
+            evaluate_condition({"op": "contains", "key": "caps", "value": "rag"}, {"caps": 5})
+        )
 
     def test_exists(self):
         self.assertTrue(evaluate_condition({"op": "exists", "key": "k"}, {"k": "v"}))

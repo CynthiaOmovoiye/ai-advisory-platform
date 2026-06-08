@@ -23,15 +23,16 @@ class MockLLMProvider:
     name = "mock"
 
     def enhance(self, finding: Finding) -> Enhancement:
+        severity = finding.severity.name.lower()
         return Enhancement(
             finding_id=finding.id,
             rationale=(
-                f"This finding was raised because the assessment responses matched "
+                "This finding was raised because the assessment responses matched "
                 f"rule {finding.rule_code}. {finding.detail}"
             ),
             remediation=(
-                f"Prioritise addressing '{finding.title}' given its {finding.severity.name.lower()} "
-                f"severity, and re-assess once remediated."
+                f"Prioritise addressing '{finding.title}' given its {severity} "
+                "severity, and re-assess once remediated."
             ),
             referenced_finding_ids=(finding.id,),
         )

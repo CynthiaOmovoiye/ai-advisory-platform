@@ -13,7 +13,6 @@ directly (still behind a thin repository for testability).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -80,7 +79,7 @@ class SqlMetricsRepository:
             or 0
         )
 
-        latest: Optional[EvaluationRunRow] = s.execute(
+        latest: EvaluationRunRow | None = s.execute(
             select(EvaluationRunRow).order_by(EvaluationRunRow.created_at.desc()).limit(1)
         ).scalar_one_or_none()
 
@@ -92,7 +91,9 @@ class SqlMetricsRepository:
             ai_usage={
                 "recommendations_total": rec_total,
                 "by_source": {str(k): int(v) for k, v in by_source.items()},
-                "grounding_pass_rate": round(grounded / llm_attempted, 4) if llm_attempted else None,
+                "grounding_pass_rate": round(grounded / llm_attempted, 4)
+                if llm_attempted
+                else None,
             },
             evaluation={
                 "latest_accuracy": latest.accuracy if latest else None,

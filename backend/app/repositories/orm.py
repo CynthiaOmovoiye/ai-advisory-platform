@@ -10,7 +10,7 @@ Every tenant-owned table carries ``organization_id`` (ADR-0006).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -19,7 +19,7 @@ from app.infra.db import Base, JSONType
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Organization(Base):
@@ -40,9 +40,7 @@ class Assessment(Base):
     ruleset_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     status: Mapped[str] = mapped_column(String, nullable=False, default="in_progress")
 
-    responses: Mapped[list["Response"]] = relationship(
-        cascade="all, delete-orphan", lazy="selectin"
-    )
+    responses: Mapped[list[Response]] = relationship(cascade="all, delete-orphan", lazy="selectin")
 
 
 class Response(Base):

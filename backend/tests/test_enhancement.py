@@ -6,7 +6,6 @@ import unittest
 from app.domain.rules import engine
 from app.llm.enhancement import enhance_findings
 from app.llm.mock import FabricatingLLMProvider, FailingLLMProvider, MockLLMProvider
-
 from tests.conftest import load_baseline_ruleset
 
 

@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
-from app.api import deps
 from app.api.app import create_app
 from app.api.deps import CallerContext, get_caller, get_db
 from app.domain.access import Principal, Role
@@ -56,16 +55,40 @@ class TestApi(unittest.TestCase):
 
     def _seed(self):
         s = self.SessionFactory()
-        s.add_all([Organization(id=ORG_A, name="A", slug="a"),
-                   Organization(id=ORG_B, name="B", slug="b")])
-        s.add(Assessment(id="assess-a", organization_id=ORG_A, template_name="ai_readiness",
-                         ruleset_name="baseline", ruleset_version=1))
-        s.add_all([
-            Response(id="r1", assessment_id="assess-a", question_key="mfa_enabled", value=False),
-            Response(id="r2", assessment_id="assess-a", question_key="sensitive_data_present", value=True),
-        ])
-        s.add(Assessment(id="assess-b", organization_id=ORG_B, template_name="ai_readiness",
-                         ruleset_name="baseline", ruleset_version=1))
+        s.add_all(
+            [Organization(id=ORG_A, name="A", slug="a"), Organization(id=ORG_B, name="B", slug="b")]
+        )
+        s.add(
+            Assessment(
+                id="assess-a",
+                organization_id=ORG_A,
+                template_name="ai_readiness",
+                ruleset_name="baseline",
+                ruleset_version=1,
+            )
+        )
+        s.add_all(
+            [
+                Response(
+                    id="r1", assessment_id="assess-a", question_key="mfa_enabled", value=False
+                ),
+                Response(
+                    id="r2",
+                    assessment_id="assess-a",
+                    question_key="sensitive_data_present",
+                    value=True,
+                ),
+            ]
+        )
+        s.add(
+            Assessment(
+                id="assess-b",
+                organization_id=ORG_B,
+                template_name="ai_readiness",
+                ruleset_name="baseline",
+                ruleset_version=1,
+            )
+        )
         s.commit()
         s.close()
 
@@ -132,8 +155,7 @@ class TestApi(unittest.TestCase):
             return get_caller in seen
 
         v1_routes = [
-            r for r in self.app.routes
-            if isinstance(r, APIRoute) and r.path.startswith("/v1/")
+            r for r in self.app.routes if isinstance(r, APIRoute) and r.path.startswith("/v1/")
         ]
         self.assertTrue(v1_routes)
         for route in v1_routes:

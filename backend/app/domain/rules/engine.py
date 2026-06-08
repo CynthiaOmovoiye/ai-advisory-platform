@@ -8,7 +8,8 @@ inputs it always produces the same findings, in the same order.
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from .conditions import evaluate_condition
 from .models import Finding, Rule, Ruleset
@@ -21,7 +22,7 @@ _PLACEHOLDER = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
 
 def render_template(text: str, facts: Mapping[str, Any]) -> str:
-    def repl(match: "re.Match[str]") -> str:
+    def repl(match: re.Match[str]) -> str:
         key = match.group(1)
         return str(facts[key]) if key in facts else match.group(0)
 

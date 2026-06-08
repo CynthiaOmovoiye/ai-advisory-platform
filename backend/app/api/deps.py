@@ -19,9 +19,10 @@ Two security-critical pieces live here:
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import json
+from collections.abc import Callable, Iterator
 from functools import lru_cache
-from typing import Callable
+from pathlib import Path
 
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session, sessionmaker
@@ -31,10 +32,12 @@ from app.domain.rules.models import Ruleset, ruleset_from_dict
 from app.infra.auth import CallerContext, decode_session, extract_token
 from app.infra.config import Settings, get_settings
 from app.infra.db import make_engine, make_session_factory
+from app.infra.storage import ObjectStorage, S3Storage
 from app.llm.mock import MockLLMProvider
 from app.llm.openrouter import ModelPricing, OpenRouterConfig, OpenRouterProvider
 from app.llm.provider import LLMProvider
-from app.infra.storage import ObjectStorage, S3Storage
+from app.reports.renderer import PlaywrightRenderer
+from app.reports.service import ReportService
 from app.repositories.base import TenantScope
 from app.repositories.sql import (
     SqlAssessmentRepository,
@@ -43,21 +46,17 @@ from app.repositories.sql import (
     SqlRecommendationRepository,
     SqlReportRepository,
 )
-from app.reports.renderer import PlaywrightRenderer
-from app.reports.service import ReportService
 from app.services.assessment_service import AssessmentService
 from app.services.evaluation_service import EvaluationService
 from app.services.metrics_service import SqlMetricsRepository
 from app.services.recommendation_service import RecommendationService
-
-import json
-from pathlib import Path
 
 _DATA = Path(__file__).resolve().parents[2] / "data"
 
 
 # CallerContext is defined in app.infra.auth (the verifier produces it) and re-exported
 # here for the routers/guards that depend on it.
+
 
 # --------------------------------------------------------------------------- #
 # Database session (one per request, with commit/rollback handled by the route).

@@ -14,7 +14,6 @@ from app.repositories.memory import (
     InMemoryRecommendationRepository,
 )
 from app.services.assessment_service import AssessmentService
-
 from tests.conftest import load_baseline_ruleset
 
 ORG_A = "org-a"

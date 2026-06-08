@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,7 +35,7 @@ class Settings(BaseSettings):
     storage_endpoint: str = "http://localhost:9000"
     storage_bucket: str = "advisory-documents"
     storage_access_key: str = "minioadmin"
-    storage_secret_key: str = "minioadmin"
+    storage_secret_key: str = "minioadmin"  # noqa: S105 - local-dev default, overridden by env
     storage_region: str = "us-east-1"
 
     # API security

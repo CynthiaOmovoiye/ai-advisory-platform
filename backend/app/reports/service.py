@@ -37,7 +37,9 @@ class ReportService:
     storage: ObjectStorage
     renderer: ReportRenderer
 
-    def generate(self, scope: TenantScope, assessment_id: str, *, organization_name: str) -> ReportRecord:
+    def generate(
+        self, scope: TenantScope, assessment_id: str, *, organization_name: str
+    ) -> ReportRecord:
         assessment = self.assessments.get(assessment_id, scope)
         if assessment is None:
             raise NotFound("assessment not found")  # cross-tenant ids resolve here too
@@ -52,7 +54,8 @@ class ReportService:
         pending = [r for r in recs if r.status in ("draft", "edited")]
         if pending:
             raise Conflict(
-                f"{len(pending)} recommendation(s) still awaiting review; approve or reject before publishing"
+                f"{len(pending)} recommendation(s) still awaiting review; "
+                "approve or reject before publishing"
             )
         approved = [r for r in recs if r.status == "approved"]
 
@@ -61,8 +64,8 @@ class ReportService:
             assessment_title=assessment.template_name,
             recommendations=approved,
         )
-        html = render_report_html(model)          # escaped, untrusted-safe
-        pdf = self.renderer.render_pdf(html)       # Playwright in prod; offline render
+        html = render_report_html(model)  # escaped, untrusted-safe
+        pdf = self.renderer.render_pdf(html)  # Playwright in prod; offline render
 
         # Opaque, tenant-namespaced key — never a public path (security-review §5).
         key = f"reports/{scope.organization_id}/{assessment_id}.pdf"

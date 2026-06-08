@@ -16,8 +16,9 @@ every finding still produces a complete recommendation.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, Optional, Sequence
+from typing import Literal
 
 from app.domain.grounding import check_grounding
 from app.domain.rules.models import Finding, Severity
@@ -42,14 +43,14 @@ class Recommendation:
     rationale: str
     remediation: str
     source: Literal["llm", "fallback"]
-    grounding_passed: Optional[bool]
+    grounding_passed: bool | None
     grounding_reasons: tuple[str, ...] = ()
     # Consultant-workspace lifecycle (db/schema.sql: recommendations.status). New
     # recommendations are 'draft'; a consultant edits/approves/rejects them, and only
     # 'approved' ones reach a published report (the approval gate).
     status: str = "draft"
-    id: Optional[str] = None  # set when loaded from persistence (assessment:rule_code)
-    edited_by: Optional[str] = None
+    id: str | None = None  # set when loaded from persistence (assessment:rule_code)
+    edited_by: str | None = None
 
 
 def _deterministic_narrative(finding: Finding) -> tuple[str, str]:
@@ -107,7 +108,7 @@ def _rec(
     remediation: str,
     *,
     source: Literal["llm", "fallback"],
-    passed: Optional[bool],
+    passed: bool | None,
     reasons: tuple[str, ...] = (),
 ) -> Recommendation:
     return Recommendation(

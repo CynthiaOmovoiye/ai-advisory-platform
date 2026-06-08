@@ -26,8 +26,9 @@ Condition tree shape (matches ``rules.condition`` JSONB in db/schema.sql)::
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from numbers import Number
-from typing import Any, Mapping
+from typing import Any
 
 MAX_DEPTH = 32  # bound recursion; a hostile/buggy rule cannot exhaust the stack
 

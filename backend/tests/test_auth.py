@@ -55,8 +55,11 @@ class TestDecodeSession(unittest.TestCase):
         self.assertEqual(caller.principal.org_roles["org-a"], frozenset({Role.ORG_USER}))
 
     def test_bad_signature_fails_closed(self):
-        forged = jwt.encode({"sub": "x", "org": "org-a", "iss": ISS, "aud": AUD,
-                             "exp": int(time.time()) + 60}, "WRONG-SECRET", algorithm="HS256")
+        forged = jwt.encode(
+            {"sub": "x", "org": "org-a", "iss": ISS, "aud": AUD, "exp": int(time.time()) + 60},
+            "WRONG-SECRET",
+            algorithm="HS256",
+        )
         with self.assertRaises(Unauthorized):
             decode(forged)
 
@@ -79,11 +82,14 @@ class TestDecodeSession(unittest.TestCase):
 
 class TestExtractToken(unittest.TestCase):
     def test_from_authjs_cookie(self):
-        self.assertEqual(extract_token(cookies={"authjs.session-token": "abc"}, authorization=None), "abc")
+        self.assertEqual(
+            extract_token(cookies={"authjs.session-token": "abc"}, authorization=None), "abc"
+        )
 
     def test_from_secure_cookie(self):
         self.assertEqual(
-            extract_token(cookies={"__Secure-authjs.session-token": "xyz"}, authorization=None), "xyz"
+            extract_token(cookies={"__Secure-authjs.session-token": "xyz"}, authorization=None),
+            "xyz",
         )
 
     def test_from_bearer_header(self):

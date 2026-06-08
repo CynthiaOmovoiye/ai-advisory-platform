@@ -17,7 +17,7 @@ against these Protocols and works with either backend unchanged.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Protocol
 
 from app.llm.enhancement import Recommendation
 
@@ -57,9 +57,11 @@ class AssessmentRecord:
 # Protocols — the service depends on these, not on concrete implementations.
 # --------------------------------------------------------------------------- #
 class AssessmentRepository(Protocol):
-    def get(self, assessment_id: str, scope: TenantScope) -> Optional[AssessmentRecord]: ...
+    def get(self, assessment_id: str, scope: TenantScope) -> AssessmentRecord | None: ...
     def list(self, scope: TenantScope) -> list[AssessmentRecord]: ...
-    def set_status(self, assessment_id: str, status: str, scope: TenantScope) -> AssessmentRecord: ...
+    def set_status(
+        self, assessment_id: str, status: str, scope: TenantScope
+    ) -> AssessmentRecord: ...
 
 
 class RecommendationRepository(Protocol):
@@ -69,7 +71,7 @@ class RecommendationRepository(Protocol):
     def list_for_assessment(
         self, assessment_id: str, scope: TenantScope
     ) -> list[Recommendation]: ...
-    def get(self, recommendation_id: str, scope: TenantScope) -> Optional[Recommendation]: ...
+    def get(self, recommendation_id: str, scope: TenantScope) -> Recommendation | None: ...
     def update(self, recommendation: Recommendation, scope: TenantScope) -> Recommendation: ...
 
 
@@ -88,11 +90,9 @@ class ReportRecord:
     assessment_id: str
     title: str
     status: str
-    pdf_storage_key: Optional[str]
+    pdf_storage_key: str | None
 
 
 class ReportRepository(Protocol):
     def save(self, report: ReportRecord, scope: TenantScope) -> None: ...
-    def get_for_assessment(
-        self, assessment_id: str, scope: TenantScope
-    ) -> Optional[ReportRecord]: ...
+    def get_for_assessment(self, assessment_id: str, scope: TenantScope) -> ReportRecord | None: ...
