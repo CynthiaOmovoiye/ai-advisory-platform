@@ -34,6 +34,20 @@ export default function AdminDashboard() {
       </section>
 
       <section className="rounded-lg border bg-white p-4">
+        <h3 className="font-semibold">LLM telemetry (captured)</h3>
+        <dl className="mt-2 grid grid-cols-2 gap-2 text-sm md:grid-cols-3">
+          <Item label="LLM calls" value={String(m.ai_usage.llm_calls)} />
+          <Item label="Estimated cost" value={`$${m.ai_usage.estimated_cost_usd.toFixed(4)}`} />
+          <Item
+            label="Avg latency"
+            value={m.ai_usage.avg_latency_ms == null ? "—" : `${m.ai_usage.avg_latency_ms} ms`}
+          />
+          <Item label="Input tokens" value={m.ai_usage.total_input_tokens.toLocaleString()} />
+          <Item label="Output tokens" value={m.ai_usage.total_output_tokens.toLocaleString()} />
+        </dl>
+      </section>
+
+      <section className="rounded-lg border bg-white p-4">
         <h3 className="font-semibold">Latest evaluation</h3>
         <dl className="mt-2 grid grid-cols-3 gap-2 text-sm">
           <Item label="Accuracy" value={fmt(m.evaluation.latest_accuracy)} />

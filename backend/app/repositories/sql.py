@@ -36,6 +36,7 @@ from .orm import (
     Assessment,
     AuditLogRow,
     EvaluationRunRow,
+    LlmCallRow,
     Organization,
     OrganizationMember,
     RecommendationRow,
@@ -380,3 +381,39 @@ def _to_member(row: OrganizationMember) -> MemberRecord:
         status=row.status,
         user_id=row.user_id,
     )
+
+
+class SqlLlmCallSink:
+    """Persists per-call LLM telemetry to the llm_calls table (satisfies LlmCallSink)."""
+
+    def __init__(self, session: Session) -> None:
+        self._s = session
+
+    def record(
+        self,
+        *,
+        model_id: str,
+        status: str,
+        latency_ms: int,
+        input_tokens: int | None,
+        output_tokens: int | None,
+        cost_estimate=None,
+        organization_id: str | None,
+        assessment_id: str | None,
+        correlation_id: str | None,
+    ) -> None:
+        self._s.add(
+            LlmCallRow(
+                id=str(uuid.uuid4()),
+                organization_id=organization_id,
+                assessment_id=assessment_id,
+                model_id=model_id,
+                status=status,
+                latency_ms=latency_ms,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_estimate=cost_estimate,
+                correlation_id=correlation_id,
+            )
+        )
+        self._s.flush()

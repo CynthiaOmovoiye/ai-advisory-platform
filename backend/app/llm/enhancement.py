@@ -16,14 +16,35 @@ every finding still produces a complete recommendation.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
+from decimal import Decimal
+from typing import Literal, Protocol
 
 from app.domain.grounding import check_grounding
 from app.domain.rules.models import Finding, Severity
 
 from .provider import LLMError, LLMProvider
+
+
+class LlmCallSink(Protocol):
+    """Persistence sink for per-call LLM telemetry (an llm_calls row). Defined here to
+    avoid a cycle with the repository layer; SQL/in-memory impls satisfy it structurally."""
+
+    def record(
+        self,
+        *,
+        model_id: str,
+        status: str,
+        latency_ms: int,
+        input_tokens: int | None,
+        output_tokens: int | None,
+        cost_estimate: Decimal | None,
+        organization_id: str | None,
+        assessment_id: str | None,
+        correlation_id: str | None,
+    ) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -64,11 +85,62 @@ def _deterministic_narrative(finding: Finding) -> tuple[str, str]:
     return rationale, remediation
 
 
-def enhance_findings(findings: Sequence[Finding], provider: LLMProvider) -> list[Recommendation]:
+def enhance_findings(
+    findings: Sequence[Finding],
+    provider: LLMProvider,
+    *,
+    telemetry: LlmCallSink | None = None,
+    organization_id: str | None = None,
+    assessment_id: str | None = None,
+    correlation_id: str | None = None,
+) -> list[Recommendation]:
+    """Enhance each finding and (optionally) record an llm_calls telemetry row per call.
+
+    Telemetry is captured here — the single point that sees every provider call — so it
+    works uniformly for the real OpenRouter provider (token/cost from ``provider.last_call``)
+    and the mock (latency only). Cost/observability is a first-class concern (architecture §7).
+    """
     recommendations: list[Recommendation] = []
     for finding in findings:
-        recommendations.append(_enhance_one(finding, provider))
+        start = time.perf_counter()
+        rec = _enhance_one(finding, provider)
+        if telemetry is not None:
+            _record_call(
+                telemetry, provider, rec, start, organization_id, assessment_id, correlation_id
+            )
+        recommendations.append(rec)
     return recommendations
+
+
+def _record_call(
+    sink: LlmCallSink,
+    provider: LLMProvider,
+    rec: Recommendation,
+    start: float,
+    organization_id: str | None,
+    assessment_id: str | None,
+    correlation_id: str | None,
+) -> None:
+    # Status derives from the recommendation outcome (no need to re-inspect the provider):
+    #   grounded LLM output -> success; ungrounded (rejected) -> rejected; provider error -> error.
+    if rec.grounding_passed:
+        status = "success"
+    elif rec.grounding_passed is False:
+        status = "rejected"
+    else:
+        status = "error"
+    last = getattr(provider, "last_call", None)  # OpenRouter exposes real tokens/cost; mock doesn't
+    sink.record(
+        model_id=last.model_id if last else getattr(provider, "name", "unknown"),
+        status=status,
+        latency_ms=last.latency_ms if last else int((time.perf_counter() - start) * 1000),
+        input_tokens=last.input_tokens if last else None,
+        output_tokens=last.output_tokens if last else None,
+        cost_estimate=last.cost_estimate if last else None,
+        organization_id=organization_id,
+        assessment_id=assessment_id,
+        correlation_id=(last.correlation_id if last else correlation_id),
+    )
 
 
 def _enhance_one(finding: Finding, provider: LLMProvider) -> Recommendation:

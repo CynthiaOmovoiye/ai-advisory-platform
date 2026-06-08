@@ -43,6 +43,7 @@ from app.repositories.sql import (
     SqlAssessmentRepository,
     SqlAuditSink,
     SqlEvaluationRunRepository,
+    SqlLlmCallSink,
     SqlMemberRepository,
     SqlOrganizationRepository,
     SqlRecommendationRepository,
@@ -172,6 +173,7 @@ def get_assessment_service(
         audit=SqlAuditSink(db),
         ruleset=_baseline_ruleset(),
         llm=_llm_provider(settings),
+        telemetry=SqlLlmCallSink(db),  # persist llm_calls for the cost dashboard
     )
 
 

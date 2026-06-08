@@ -12,7 +12,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infra.db import Base, JSONType
@@ -129,6 +138,25 @@ class EvaluationRunRow(Base):
     item_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     triggered_by: Mapped[str] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class LlmCallRow(Base):
+    """One LLM invocation — the observability/cost record (architecture §7)."""
+
+    __tablename__ = "llm_calls"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    organization_id: Mapped[str] = mapped_column(String, index=True, nullable=True)
+    assessment_id: Mapped[str] = mapped_column(String, nullable=True)
+    model_id: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)  # success|rejected|error|timeout
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=True)
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=True)
+    cost_estimate: Mapped[float] = mapped_column(Numeric(12, 6), nullable=True)
+    correlation_id: Mapped[str] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, default=_utcnow
+    )
 
 
 class AuditLogRow(Base):

@@ -50,6 +50,11 @@ export const AdminMetrics = z.object({
     recommendations_total: z.number(),
     by_source: z.record(z.string(), z.number()),
     grounding_pass_rate: z.number().nullable(),
+    llm_calls: z.number(),
+    total_input_tokens: z.number(),
+    total_output_tokens: z.number(),
+    estimated_cost_usd: z.number(),
+    avg_latency_ms: z.number().nullable(),
   }),
   evaluation: z.object({
     latest_accuracy: z.number().nullable(),

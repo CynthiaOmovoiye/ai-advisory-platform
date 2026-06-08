@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.repositories.orm import (
     Assessment,
     EvaluationRunRow,
+    LlmCallRow,
     Organization,
     RecommendationRow,
     ReportRow,
@@ -83,6 +84,13 @@ class SqlMetricsRepository:
             select(EvaluationRunRow).order_by(EvaluationRunRow.created_at.desc()).limit(1)
         ).scalar_one_or_none()
 
+        # LLM telemetry (llm_calls) — real captured cost/latency/tokens.
+        llm_calls = s.scalar(select(func.count()).select_from(LlmCallRow)) or 0
+        total_cost = s.scalar(select(func.coalesce(func.sum(LlmCallRow.cost_estimate), 0)))
+        total_in = s.scalar(select(func.coalesce(func.sum(LlmCallRow.input_tokens), 0))) or 0
+        total_out = s.scalar(select(func.coalesce(func.sum(LlmCallRow.output_tokens), 0))) or 0
+        avg_latency = s.scalar(select(func.avg(LlmCallRow.latency_ms)))
+
         return AdminMetrics(
             organizations=orgs,
             assessments_total=assessments_total,
@@ -94,6 +102,11 @@ class SqlMetricsRepository:
                 "grounding_pass_rate": round(grounded / llm_attempted, 4)
                 if llm_attempted
                 else None,
+                "llm_calls": llm_calls,
+                "total_input_tokens": int(total_in),
+                "total_output_tokens": int(total_out),
+                "estimated_cost_usd": float(total_cost or 0),
+                "avg_latency_ms": round(float(avg_latency), 1) if avg_latency is not None else None,
             },
             evaluation={
                 "latest_accuracy": latest.accuracy if latest else None,

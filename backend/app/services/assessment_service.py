@@ -20,7 +20,7 @@ from app.domain.access import Permission, Principal, authorize
 from app.domain.rules import engine
 from app.domain.rules.models import Ruleset, facts_from_responses
 from app.errors import Conflict, NotFound
-from app.llm.enhancement import Recommendation, enhance_findings
+from app.llm.enhancement import LlmCallSink, Recommendation, enhance_findings
 from app.llm.provider import LLMProvider
 from app.repositories.base import (
     AssessmentRepository,
@@ -39,6 +39,7 @@ class AssessmentService:
     audit: AuditSink
     ruleset: Ruleset
     llm: LLMProvider
+    telemetry: LlmCallSink | None = None  # optional llm_calls persistence (observability)
 
     def complete(
         self, principal: Principal, organization_id: str, assessment_id: str
@@ -69,7 +70,13 @@ class AssessmentService:
         findings = engine.evaluate(self.ruleset, facts)
 
         # 4) LLM enhancement, gated by grounding, with deterministic fallback.
-        recommendations = enhance_findings(findings, self.llm)
+        recommendations = enhance_findings(
+            findings,
+            self.llm,
+            telemetry=self.telemetry,
+            organization_id=organization_id,
+            assessment_id=assessment_id,
+        )
 
         # 5) Persist + advance status (the transaction boundary).
         self.recommendations.save_for_assessment(assessment_id, recommendations, scope)

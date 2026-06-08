@@ -190,6 +190,9 @@ class OpenRouterProvider:
         self._sleeper = sleeper
         self._correlation_id = correlation_id
         self._client = client or self._build_client(config)
+        # The most recent call's stats — read by the enhancement pipeline so it can
+        # persist token/cost telemetry at a single point (app/llm/enhancement.py).
+        self.last_call: LLMCall | None = None
 
     @staticmethod
     def _build_client(config: OpenRouterConfig) -> Any:
@@ -276,17 +279,17 @@ class OpenRouterProvider:
         output_tokens: int | None = None,
         cost: Decimal | None = None,
     ) -> None:
-        self._telemetry.record(
-            LLMCall(
-                model_id=self._pricing.model_id,
-                status=status,
-                latency_ms=int((time.perf_counter() - start) * 1000),
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cost_estimate=cost,
-                correlation_id=self._correlation_id,
-            )
+        call = LLMCall(
+            model_id=self._pricing.model_id,
+            status=status,
+            latency_ms=int((time.perf_counter() - start) * 1000),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost_estimate=cost,
+            correlation_id=self._correlation_id,
         )
+        self.last_call = call
+        self._telemetry.record(call)
 
     def close(self) -> None:
         self._client.close()
