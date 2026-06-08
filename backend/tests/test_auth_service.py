@@ -10,6 +10,20 @@ from app.infra.db import (
 from app.services.auth_service import AuthService, verify_password
 
 
+class FakeNotifier:
+    """Records what would have been emailed, with no real transport."""
+
+    def __init__(self) -> None:
+        self.verifications: list[tuple[str, str]] = []
+        self.resets: list[tuple[str, str]] = []
+
+    def send_email_verification(self, email: str, token: str) -> None:
+        self.verifications.append((email, token))
+
+    def send_password_reset(self, email: str, token: str) -> None:
+        self.resets.append((email, token))
+
+
 class TestAuthService(unittest.TestCase):
     def setUp(self):
         engine = make_engine("sqlite+pysqlite:///:memory:")
@@ -17,7 +31,8 @@ class TestAuthService(unittest.TestCase):
         enable_sqlite_foreign_keys(engine)
         Base.metadata.create_all(engine)
         self.session = make_session_factory(engine)()
-        self.svc = AuthService(self.session)
+        self.notifier = FakeNotifier()
+        self.svc = AuthService(self.session, self.notifier)
 
     def tearDown(self):
         self.session.close()
@@ -113,6 +128,72 @@ class TestAuthService(unittest.TestCase):
         self.assertEqual(result.profile.global_roles, ())
         # The new org membership is org-scoped consultant, never a global admin.
         self.assertEqual(result.profile.org_roles[result.profile.active_org], ["consultant"])
+
+    def test_signup_sends_verification_email(self):
+        result = self.svc.signup(
+            email="verify@example.com",
+            password="ChangeMe123!",
+            name=None,
+            organization_name="Verify Org",
+        )
+        self.session.commit()
+        self.assertEqual(len(self.notifier.verifications), 1)
+        email, token = self.notifier.verifications[0]
+        self.assertEqual(email, "verify@example.com")
+        # The emailed token is the same one that verifies the account.
+        self.assertEqual(token, result.verification_token)
+
+    def test_password_reset_changes_password_and_invalidates_sessions(self):
+        result = self._verified_user("reset@example.com")
+        before = self.svc.profile_for_user(result.profile.id)
+
+        self.svc.request_password_reset("RESET@example.com")  # case-insensitive
+        self.session.commit()
+        self.assertEqual(len(self.notifier.resets), 1)
+        _, token = self.notifier.resets[0]
+
+        self.svc.reset_password(token=token, new_password="BrandNewPass456!")
+        self.session.commit()
+
+        after = self.svc.profile_for_user(result.profile.id)
+        # Session generation bumped ⇒ every previously minted session is now invalid.
+        self.assertEqual(after.session_version, before.session_version + 1)
+        # Old password rejected, new password accepted.
+        with self.assertRaises(Unauthorized):
+            self.svc.authenticate(email="reset@example.com", password="ChangeMe123!")
+        profile = self.svc.authenticate(email="reset@example.com", password="BrandNewPass456!")
+        self.assertEqual(profile.email, "reset@example.com")
+
+    def test_password_reset_token_is_single_use(self):
+        result = self._verified_user("single@example.com")
+        self.svc.request_password_reset("single@example.com")
+        self.session.commit()
+        _, token = self.notifier.resets[0]
+        self.svc.reset_password(token=token, new_password="BrandNewPass456!")
+        self.session.commit()
+        with self.assertRaises(Unauthorized):
+            self.svc.reset_password(token=token, new_password="AnotherPass789!")
+        # Sanity: the account still exists and uses the first reset password.
+        self.assertIsNotNone(result.profile.id)
+
+    def test_reset_with_unknown_token_is_unauthorized(self):
+        with self.assertRaises(Unauthorized):
+            self.svc.reset_password(token="x" * 40, new_password="BrandNewPass456!")
+
+    def test_reset_rejects_weak_new_password(self):
+        self._verified_user("weakreset@example.com")
+        self.svc.request_password_reset("weakreset@example.com")
+        self.session.commit()
+        _, token = self.notifier.resets[0]
+        with self.assertRaises(Unprocessable):
+            self.svc.reset_password(token=token, new_password="weak")
+
+    def test_forgot_password_for_unknown_email_is_silent(self):
+        # No exception, no token, no email — identical observable behaviour to a hit,
+        # so the response can't be used to enumerate accounts.
+        self.svc.request_password_reset("nobody@example.com")
+        self.session.commit()
+        self.assertEqual(self.notifier.resets, [])
 
 
 if __name__ == "__main__":

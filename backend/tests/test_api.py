@@ -147,6 +147,8 @@ class TestApi(unittest.TestCase):
             ("/v1/auth/signup", "POST"),
             ("/v1/auth/signin", "POST"),
             ("/v1/auth/verify-email", "POST"),
+            ("/v1/auth/forgot-password", "POST"),
+            ("/v1/auth/reset-password", "POST"),
         }
 
         def guarded(route: APIRoute) -> bool:
