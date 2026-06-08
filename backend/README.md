@@ -35,7 +35,8 @@ SQLAlchemy persistence, FastAPI API) adds the real stack and is fully tested off
 | `app/llm/openrouter.py` | **Real OpenRouter provider** (ADR-0004): structured output, bounded retries + exponential backoff, and token/cost/latency telemetry (`llm_calls`). Pure helpers split from httpx I/O. |
 | `app/infra/` | Settings (env-driven) + DB engine/session plumbing (JSONB on Postgres, JSON on SQLite). |
 | `app/repositories/orm.py`, `sql.py` | SQLAlchemy ORM + **SQL repositories** satisfying the same Protocols as the in-memory ones — tenant scope enforced in every query (ADR-0006). |
-| `app/services/auth_service.py` | Real credential auth: signup, Argon2 password hashing, email verification tokens, signin, and membership-derived session claims. |
+| `app/services/auth_service.py` | Real credential auth: signup, Argon2 password hashing, email verification, signin, password reset (with session invalidation via `session_version`), and membership-derived session claims. |
+| `app/infra/email.py`, `app/services/notification_service.py` | Pluggable email transport (console / SMTP / Resend) + the verification/reset email templates. |
 | `migrations/` | **Alembic** setup + initial migration (`0001_initial`). |
 | `app/api/` | FastAPI app: DI (`deps.py`), the default-deny guard, assessment routes, sanitized error handlers, secure headers, correlation ids. |
 | `app/schemas/` | Pydantic v2 API DTOs. |
@@ -106,5 +107,6 @@ Verification: `pytest -q` (158 tests), `ruff check .`, `ruff format --check .`, 
 ## Intentional extension points (designed, not built)
 
 RAG/pgvector knowledge base, agent workflows, a human-in-the-loop review-queue table,
-a real malware scanner behind the scan interface, SMTP-backed email delivery, and
-password reset UI/delivery.
+and a real malware scanner behind the scan interface. (Email delivery — SMTP/Resend —
+and password reset are now implemented; see `app/infra/email.py` and the
+`/auth/forgot-password` + `/auth/reset-password` routes.)

@@ -31,9 +31,10 @@ path no longer exists.
 | Control | Design |
 |---|---|
 | Sessions | Auth.js secure, httpOnly, SameSite cookies; BFF mints short-lived API service tokens. |
-| Session invalidation | Signout clears the Auth.js session. Server-side revocation/session-versioning is future work for password reset and role-change invalidation. |
-| Password reset | Future work: use the same hashed, single-use token pattern as email verification. |
-| Email verification | Implemented as hashed, single-use, time-boxed tokens. Local dev returns the token; production must deliver it by SMTP. |
+| Session invalidation | **Implemented** via per-user `session_version`. The BFF carries it as a session claim (`sv`); the API rejects any token whose version is behind the user's current one, so a password reset invalidates every previously minted session. Signout also clears the Auth.js session. Role-change invalidation can reuse the same bump. |
+| Password reset | **Implemented**: `POST /auth/forgot-password` issues a hashed, single-use, time-boxed token (60 min) and emails a reset link; `POST /auth/reset-password` sets the new Argon2 hash, marks the token used, and bumps `session_version`. Forgot-password responds identically whether or not the email exists (no enumeration). |
+| Email verification | **Implemented** as hashed, single-use, time-boxed tokens (24 h), delivered by the configured email provider (SMTP / Resend). Local dev can additionally return the token (`LOCAL_EMAIL_VERIFICATION_TOKENS`) for a no-SMTP loop. |
+| Email delivery | Pluggable provider (`EMAIL_PROVIDER`): `console` (logs, dev default), `smtp` (Mailtrap or any SMTP), or `resend` (HTTP API). Delivery is best-effort and never changes the observable auth response. A provider selected without credentials degrades to console. |
 | Credential storage | Argon2 password hashes in `users.password_hash`; raw passwords are never stored or returned. |
 
 ---

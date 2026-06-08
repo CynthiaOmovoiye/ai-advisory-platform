@@ -68,8 +68,9 @@ exists: no hardcoded demo identity claims and no automatic global admin.
 
 What **is** production-shaped (and implemented):
 
-- Sign up, local-dev email verification, sign in, sign out, and active-organization
-  switching.
+- Sign up, email verification, sign in, sign out, active-organization switching,
+  **password reset** (`/forgot-password` → emailed link → `/reset-password`), and a
+  `/verify-email` landing page for the emailed verification link.
 - The **BFF trust boundary** ([ADR-0009](../docs/adr/0009-auth-bff-session-token.md)):
   the Next.js server mints a short-lived HS256 service token from the session and the
   FastAPI backend verifies it (signature, issuer, audience, expiry), then reloads
@@ -77,6 +78,9 @@ What **is** production-shaped (and implemented):
 - **Default-deny RBAC** and **tenant isolation** on every backend route.
 
 Local seed credentials are real persisted credentials: `demo@example.com` /
-`ChangeMe123!`. Future work: SMTP-backed email delivery and password reset UI/token
-delivery. The token storage/service boundary exists; local dev returns verification
-tokens only because no SMTP service is required.
+`ChangeMe123!`. Email is delivered by a configurable provider (`EMAIL_PROVIDER`:
+console / SMTP / Resend — see the root `.env.example`). In local dev the default
+console provider logs the verification/reset link and signup can also return the
+verification token (`LOCAL_EMAIL_VERIFICATION_TOKENS`) for a no-SMTP loop. Password
+reset bumps a per-user `session_version` that the BFF carries as the `sv` claim, so a
+reset invalidates every previously minted session.

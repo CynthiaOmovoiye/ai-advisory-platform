@@ -40,9 +40,9 @@ The browser, uploaded files, assessment free-text, and the LLM/OpenRouter are al
 | Threat | Mitigation |
 |---|---|
 | Credential stuffing / brute force | Argon2 password hashing, generic signin errors, and API rate limiting. Account lockout/escalated auth-specific throttling is future work. |
-| Session hijacking | Auth.js httpOnly+Secure+SameSite cookies; short-lived BFF service tokens; signout clears the session. Server-side revocation/session-versioning is future work. |
+| Session hijacking | Auth.js httpOnly+Secure+SameSite cookies; short-lived BFF service tokens; signout clears the session. **Session versioning is implemented** (`users.session_version`, carried as the `sv` claim): a password reset bumps it and the API rejects every token minted before the bump. |
 | Forged invitation acceptance | Invite tokens stored **hashed**, single-use, time-boxed (`organization_members`). |
-| Password-reset token theft | Future work; planned to reuse hashed, single-use, time-boxed token storage and invalidate sessions. |
+| Password-reset token theft | **Mitigated**: reset tokens are stored **hashed**, single-use, and time-boxed (60 min, `password_reset_tokens`); the raw token only ever exists in the emailed link. Completing a reset invalidates all existing sessions. Forgot-password is non-enumerating. |
 
 ### T — Tampering (integrity)
 

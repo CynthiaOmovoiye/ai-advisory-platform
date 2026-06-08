@@ -50,10 +50,20 @@ environment or a secrets manager — never committed. Key groups: database, redi
 object storage, auth, field-encryption key, OpenRouter + cost guardrails, API
 security limits.
 
-Auth is real credential verification in all environments. Local dev can return a
-one-time email verification token from signup (`LOCAL_EMAIL_VERIFICATION_TOKENS=true`)
-so onboarding works without SMTP. Production should set that false and deliver the
-same token through email infrastructure.
+Auth is real credential verification in all environments. Email (verification +
+password reset) is delivered by a pluggable provider set via `EMAIL_PROVIDER`:
+
+- `console` — logs the message (the verification/reset link appears in the API logs);
+  the dev default, no credentials required.
+- `smtp` — any SMTP server. **Mailtrap** works directly: set `SMTP_HOST`,
+  `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` from your Mailtrap inbox's SMTP tab.
+- `resend` — the Resend HTTP API: set `RESEND_API_KEY` and a verified `EMAIL_FROM`.
+
+`APP_BASE_URL` must be the public web URL so emailed links resolve. Local dev can also
+return the verification token from signup (`LOCAL_EMAIL_VERIFICATION_TOKENS=true`) for a
+no-SMTP loop; production should set that false and rely on the email provider. A
+provider selected without its credentials degrades to `console` rather than blocking
+signup.
 
 ## 4. Migrations & seed
 

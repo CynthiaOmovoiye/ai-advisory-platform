@@ -23,8 +23,7 @@ paths:
       tags:
       - Assessments
       summary: Create Assessment
-      description: Start an assessment in the caller's org from a published template
-        (Module 3).
+      description: Start an assessment in the caller's org from a published template (Module 3).
       operationId: create_assessment_v1_assessments_post
       requestBody:
         content:
@@ -147,8 +146,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/RecommendationOut'
-                title: Response List Recommendations V1 Assessments  Assessment Id  Recommendations
-                  Get
+                title: Response List Recommendations V1 Assessments  Assessment Id  Recommendations Get
         '422':
           description: Validation Error
           content:
@@ -174,6 +172,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SignupResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/auth/forgot-password:
+    post:
+      tags:
+      - Auth
+      summary: Forgot Password
+      operationId: forgot_password_v1_auth_forgot_password_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/auth/reset-password:
+    post:
+      tags:
+      - Auth
+      summary: Reset Password
+      operationId: reset_password_v1_auth_reset_password_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
         '422':
           description: Validation Error
           content:
@@ -640,8 +688,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/DocumentOut'
-                title: Response List Documents V1 Assessments  Assessment Id  Documents
-                  Get
+                title: Response List Documents V1 Assessments  Assessment Id  Documents Get
         '422':
           description: Validation Error
           content:
@@ -753,8 +800,8 @@ components:
       - sections
       - responses
       title: AssessmentDetailOut
-      description: "An assessment plus its template's questions and any saved responses\
-        \ \u2014 everything\nthe answering UI needs to render and resume the form."
+      description: "An assessment plus its template's questions and any saved responses \u2014 everything\n\
+        the answering UI needs to render and resume the form."
     AssessmentOut:
       properties:
         id:
@@ -817,6 +864,9 @@ components:
             $ref: '#/components/schemas/MembershipOut'
           type: array
           title: Memberships
+        session_version:
+          type: integer
+          title: Session Version
       type: object
       required:
       - id
@@ -828,6 +878,7 @@ components:
       - global_roles
       - org_roles
       - memberships
+      - session_version
       title: AuthProfileOut
     Body_upload_document_v1_assessments__assessment_id__documents_post:
       properties:
@@ -995,6 +1046,18 @@ components:
       - hallucination_rate
       - item_count
       title: EvaluationRunOut
+    ForgotPasswordRequest:
+      properties:
+        email:
+          type: string
+          maxLength: 254
+          minLength: 3
+          pattern: ^[^@\s]+@[^@\s]+\.[^@\s]+$
+          title: Email
+      type: object
+      required:
+      - email
+      title: ForgotPasswordRequest
     HTTPValidationError:
       properties:
         detail:
@@ -1077,6 +1140,15 @@ components:
       - organization_slug
       - role
       title: MembershipOut
+    MessageResponse:
+      properties:
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - message
+      title: MessageResponse
     OrganizationOut:
       properties:
         id:
@@ -1246,8 +1318,7 @@ components:
           title: Status
       type: object
       title: RecommendationPatch
-      description: 'Consultant edit + review action. Narrative fields are editable;
-        status moves the
+      description: 'Consultant edit + review action. Narrative fields are editable; status moves the
 
         review forward. Deterministic provenance (rule, severity, source) is NOT editable.'
     ReportOut:
@@ -1277,6 +1348,23 @@ components:
       - status
       - pdf_url
       title: ReportOut
+    ResetPasswordRequest:
+      properties:
+        token:
+          type: string
+          maxLength: 512
+          minLength: 20
+          title: Token
+        password:
+          type: string
+          maxLength: 256
+          minLength: 12
+          title: Password
+      type: object
+      required:
+      - token
+      - password
+      title: ResetPasswordRequest
     ResponseInput:
       properties:
         key:
