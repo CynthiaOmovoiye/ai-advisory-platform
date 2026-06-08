@@ -51,6 +51,7 @@ class AssessmentRecord:
     ruleset_version: int
     responses: tuple[dict, ...]  # [{"key": ..., "value": ...}]
     status: str = "in_progress"
+    template_id: str | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -62,6 +63,10 @@ class AssessmentRepository(Protocol):
     def set_status(
         self, assessment_id: str, status: str, scope: TenantScope
     ) -> AssessmentRecord: ...
+    def create(self, record: AssessmentRecord, scope: TenantScope) -> AssessmentRecord: ...
+    def save_responses(
+        self, assessment_id: str, responses: list[dict], scope: TenantScope
+    ) -> None: ...
 
 
 class RecommendationRepository(Protocol):
@@ -134,3 +139,40 @@ class MemberRepository(Protocol):
     def get(self, member_id: str, scope: TenantScope) -> MemberRecord | None: ...
     def set_status(self, member_id: str, status: str, scope: TenantScope) -> MemberRecord: ...
     def email_exists(self, email: str, scope: TenantScope) -> bool: ...
+
+
+# --- Assessment templates (Module 3) — global catalog, not tenant-owned ------ #
+@dataclass(frozen=True)
+class QuestionRecord:
+    id: str
+    key: str
+    prompt: str
+    type: str
+    config: dict
+    order_index: int
+
+
+@dataclass(frozen=True)
+class SectionRecord:
+    id: str
+    title: str
+    order_index: int
+    questions: tuple[QuestionRecord, ...]
+
+
+@dataclass(frozen=True)
+class TemplateRecord:
+    id: str
+    category: str
+    title: str
+    description: str | None
+    version: int
+    status: str
+    sections: tuple[SectionRecord, ...]
+
+
+class TemplateRepository(Protocol):
+    def create(self, template: TemplateRecord) -> None: ...
+    def list(self) -> list[TemplateRecord]: ...
+    def get(self, template_id: str) -> TemplateRecord | None: ...
+    def set_status(self, template_id: str, status: str) -> TemplateRecord: ...

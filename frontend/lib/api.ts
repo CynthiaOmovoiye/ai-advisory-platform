@@ -19,8 +19,20 @@ import {
   RecommendationList,
   RecommendationOut,
   ReportOut,
+  TemplateList,
+  TemplateOut,
+  type Template,
+  AssessmentOut,
+  type Assessment,
   type Recommendation,
 } from "./schemas";
+
+export interface TemplateInput {
+  category: string;
+  title: string;
+  description?: string;
+  sections: { title: string; questions: { key: string; prompt: string; type: string; config?: Record<string, unknown> }[] }[];
+}
 import { mintServiceToken, type SessionIdentity } from "./session-token";
 
 export interface RecommendationPatch {
@@ -163,5 +175,26 @@ export async function createOrganization(
 ): Promise<Organization> {
   return OrganizationOut.parse(
     await request(identity, `/organizations`, { method: "POST", body: JSON.stringify({ name, slug }) }),
+  );
+}
+
+
+export async function listTemplates(identity: SessionIdentity): Promise<Template[]> {
+  return TemplateList.parse(await request(identity, `/templates`));
+}
+
+export async function createTemplate(identity: SessionIdentity, input: TemplateInput): Promise<Template> {
+  return TemplateOut.parse(
+    await request(identity, `/templates`, { method: "POST", body: JSON.stringify(input) }),
+  );
+}
+
+export async function publishTemplate(identity: SessionIdentity, id: string): Promise<Template> {
+  return TemplateOut.parse(await request(identity, `/templates/${id}/publish`, { method: "POST" }));
+}
+
+export async function createAssessment(identity: SessionIdentity, templateId: string): Promise<Assessment> {
+  return AssessmentOut.parse(
+    await request(identity, `/assessments`, { method: "POST", body: JSON.stringify({ template_id: templateId }) }),
   );
 }

@@ -56,12 +56,55 @@ class OrganizationMember(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class AssessmentTemplate(Base):
+    """A versioned, reusable assessment definition (Module 3). Global catalog — not
+    tenant-owned; consultants author templates used across organizations."""
+
+    __tablename__ = "assessment_templates"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="draft")
+    sections: Mapped[list[AssessmentSection]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", order_by="AssessmentSection.order_index"
+    )
+
+
+class AssessmentSection(Base):
+    __tablename__ = "assessment_sections"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    template_id: Mapped[str] = mapped_column(
+        ForeignKey("assessment_templates.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    questions: Mapped[list[Question]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin", order_by="Question.order_index"
+    )
+
+
+class Question(Base):
+    __tablename__ = "questions"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    section_id: Mapped[str] = mapped_column(
+        ForeignKey("assessment_sections.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    key: Mapped[str] = mapped_column(String, nullable=False)  # stable id referenced by rules
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    config = mapped_column(JSONType, nullable=False, default=dict)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
 class Assessment(Base):
     __tablename__ = "assessments"
     id: Mapped[str] = mapped_column(String, primary_key=True)
     organization_id: Mapped[str] = mapped_column(
         ForeignKey("organizations.id", ondelete="CASCADE"), index=True, nullable=False
     )
+    template_id: Mapped[str] = mapped_column(String, nullable=True)  # source template (if any)
     template_name: Mapped[str] = mapped_column(String, nullable=False)
     ruleset_name: Mapped[str] = mapped_column(String, nullable=False)
     ruleset_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

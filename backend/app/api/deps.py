@@ -48,12 +48,14 @@ from app.repositories.sql import (
     SqlOrganizationRepository,
     SqlRecommendationRepository,
     SqlReportRepository,
+    SqlTemplateRepository,
 )
 from app.services.assessment_service import AssessmentService
 from app.services.evaluation_service import EvaluationService
 from app.services.metrics_service import SqlMetricsRepository
 from app.services.organization_service import OrganizationService
 from app.services.recommendation_service import RecommendationService
+from app.services.template_service import TemplateService
 
 _DATA = Path(__file__).resolve().parents[2] / "data"
 
@@ -174,7 +176,12 @@ def get_assessment_service(
         ruleset=_baseline_ruleset(),
         llm=_llm_provider(settings),
         telemetry=SqlLlmCallSink(db),  # persist llm_calls for the cost dashboard
+        templates=SqlTemplateRepository(db),  # for create-from-template (Module 3)
     )
+
+
+def get_template_service(db: Session = Depends(get_db)) -> TemplateService:
+    return TemplateService(templates=SqlTemplateRepository(db))
 
 
 def get_recommendation_service(db: Session = Depends(get_db)) -> RecommendationService:

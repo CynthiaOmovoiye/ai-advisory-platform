@@ -29,18 +29,25 @@ from .base import (
     AssessmentRecord,
     MemberRecord,
     OrganizationRecord,
+    QuestionRecord,
     ReportRecord,
+    SectionRecord,
+    TemplateRecord,
     TenantScope,
 )
 from .orm import (
     Assessment,
+    AssessmentSection,
+    AssessmentTemplate,
     AuditLogRow,
     EvaluationRunRow,
     LlmCallRow,
     Organization,
     OrganizationMember,
+    Question,
     RecommendationRow,
     ReportRow,
+    Response,
 )
 
 
@@ -75,6 +82,36 @@ class SqlAssessmentRepository:
         row.status = status
         self._s.flush()
         return _to_record(row)
+
+    def create(self, record: AssessmentRecord, scope: TenantScope) -> AssessmentRecord:
+        row = Assessment(
+            id=record.id,
+            organization_id=scope.organization_id,  # scope owns the org, not request input
+            template_id=record.template_id,
+            template_name=record.template_name,
+            ruleset_name=record.ruleset_name,
+            ruleset_version=record.ruleset_version,
+            status=record.status,
+        )
+        self._s.add(row)
+        self._s.flush()
+        return _to_record(row)
+
+    def save_responses(self, assessment_id: str, responses: list[dict], scope: TenantScope) -> None:
+        # Tenant-scoped: only touch responses of an assessment the scope owns.
+        if self.get(assessment_id, scope) is None:
+            raise KeyError(assessment_id)
+        self._s.execute(delete(Response).where(Response.assessment_id == assessment_id))
+        for r in responses:
+            self._s.add(
+                Response(
+                    id=f"{assessment_id}:{r['key']}",
+                    assessment_id=assessment_id,
+                    question_key=r["key"],
+                    value=r["value"],
+                )
+            )
+        self._s.flush()
 
 
 class SqlRecommendationRepository:
@@ -263,6 +300,7 @@ def _to_record(row: Assessment) -> AssessmentRecord:
         ruleset_version=row.ruleset_version,
         responses=tuple({"key": r.question_key, "value": r.value} for r in row.responses),
         status=row.status,
+        template_id=row.template_id,
     )
 
 
@@ -417,3 +455,86 @@ class SqlLlmCallSink:
             )
         )
         self._s.flush()
+
+
+class SqlTemplateRepository:
+    """Assessment-template catalog (Module 3). Global — not tenant-scoped."""
+
+    def __init__(self, session: Session) -> None:
+        self._s = session
+
+    def create(self, template: TemplateRecord) -> None:
+        row = AssessmentTemplate(
+            id=template.id,
+            category=template.category,
+            title=template.title,
+            description=template.description,
+            version=template.version,
+            status=template.status,
+        )
+        for s_rec in template.sections:
+            section = AssessmentSection(
+                id=s_rec.id, title=s_rec.title, order_index=s_rec.order_index
+            )
+            for q in s_rec.questions:
+                section.questions.append(
+                    Question(
+                        id=q.id,
+                        key=q.key,
+                        prompt=q.prompt,
+                        type=q.type,
+                        config=q.config,
+                        order_index=q.order_index,
+                    )
+                )
+            row.sections.append(section)
+        self._s.add(row)
+        self._s.flush()
+
+    def list(self) -> list[TemplateRecord]:
+        rows = self._s.execute(
+            select(AssessmentTemplate).order_by(AssessmentTemplate.title)
+        ).scalars()
+        return [_to_template(r) for r in rows]
+
+    def get(self, template_id: str) -> TemplateRecord | None:
+        row = self._s.get(AssessmentTemplate, template_id)
+        return _to_template(row) if row else None
+
+    def set_status(self, template_id: str, status: str) -> TemplateRecord:
+        row = self._s.get(AssessmentTemplate, template_id)
+        if row is None:
+            raise KeyError(template_id)
+        row.status = status
+        self._s.flush()
+        return _to_template(row)
+
+
+def _to_template(row: AssessmentTemplate) -> TemplateRecord:
+    return TemplateRecord(
+        id=row.id,
+        category=row.category,
+        title=row.title,
+        description=row.description,
+        version=row.version,
+        status=row.status,
+        sections=tuple(
+            SectionRecord(
+                id=s.id,
+                title=s.title,
+                order_index=s.order_index,
+                questions=tuple(
+                    QuestionRecord(
+                        id=q.id,
+                        key=q.key,
+                        prompt=q.prompt,
+                        type=q.type,
+                        config=q.config or {},
+                        order_index=q.order_index,
+                    )
+                    for q in s.questions
+                ),
+            )
+            for s in row.sections
+        ),
+    )

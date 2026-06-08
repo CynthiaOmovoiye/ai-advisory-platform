@@ -14,6 +14,7 @@ network, no API key.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 
 from app.domain.access import Permission, Principal, authorize
@@ -23,9 +24,11 @@ from app.errors import Conflict, NotFound
 from app.llm.enhancement import LlmCallSink, Recommendation, enhance_findings
 from app.llm.provider import LLMProvider
 from app.repositories.base import (
+    AssessmentRecord,
     AssessmentRepository,
     AuditSink,
     RecommendationRepository,
+    TemplateRepository,
     TenantScope,
 )
 
@@ -40,6 +43,47 @@ class AssessmentService:
     ruleset: Ruleset
     llm: LLMProvider
     telemetry: LlmCallSink | None = None  # optional llm_calls persistence (observability)
+    templates: TemplateRepository | None = None  # for create-from-template (Module 3)
+
+    def create_from_template(
+        self, principal: Principal, organization_id: str, template_id: str
+    ) -> AssessmentRecord:
+        """Start an assessment in the caller's org from a *published* template."""
+        authorize(principal, Permission.ASSESSMENT_COMPLETE, organization_id)
+        assert self.templates is not None
+        template = self.templates.get(template_id)
+        if template is None:
+            raise NotFound("template not found")
+        if template.status != "published":
+            raise Conflict("template is not published")
+        scope = TenantScope(organization_id=organization_id, acting_user_id=principal.user_id)
+        record = AssessmentRecord(
+            id=str(uuid.uuid4()),
+            organization_id=organization_id,
+            template_name=template.title,
+            ruleset_name="baseline",
+            ruleset_version=1,
+            responses=(),
+            status="in_progress",
+            template_id=template_id,
+        )
+        created = self.assessments.create(record, scope)
+        self.audit.record(
+            actor_user_id=principal.user_id,
+            organization_id=organization_id,
+            action="assessment.created",
+            entity_id=created.id,
+        )
+        return created
+
+    def save_responses(
+        self, principal: Principal, organization_id: str, assessment_id: str, responses: list[dict]
+    ) -> None:
+        authorize(principal, Permission.ASSESSMENT_COMPLETE, organization_id)
+        scope = TenantScope(organization_id=organization_id, acting_user_id=principal.user_id)
+        if self.assessments.get(assessment_id, scope) is None:
+            raise NotFound("assessment not found")
+        self.assessments.save_responses(assessment_id, responses, scope)
 
     def complete(
         self, principal: Principal, organization_id: str, assessment_id: str

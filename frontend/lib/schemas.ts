@@ -110,6 +110,38 @@ export const OrganizationOut = z.object({
 });
 export type Organization = z.infer<typeof OrganizationOut>;
 
+export const QuestionOut = z.object({
+  id: z.string(),
+  key: z.string(),
+  prompt: z.string(),
+  type: z.string(),
+  config: z.record(z.string(), z.unknown()),
+});
+export const SectionOut = z.object({
+  id: z.string(),
+  title: z.string(),
+  questions: z.array(QuestionOut),
+});
+export const TemplateOut = z.object({
+  id: z.string(),
+  category: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  version: z.number(),
+  status: z.string(),
+  sections: z.array(SectionOut),
+});
+export type Template = z.infer<typeof TemplateOut>;
+export const TemplateList = z.array(TemplateOut);
+
+export const AssessmentOut = z.object({
+  id: z.string(),
+  template_id: z.string().nullable(),
+  template_name: z.string(),
+  status: z.string(),
+});
+export type Assessment = z.infer<typeof AssessmentOut>;
+
 /** Sanitized error envelope (matches the backend `Error` schema). */
 export const ApiError = z.object({
   code: z.string(),

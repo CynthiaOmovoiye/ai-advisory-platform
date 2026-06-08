@@ -13,9 +13,42 @@ from sqlalchemy.orm import Session
 from app.api.deps import CallerContext, get_assessment_service, get_caller, get_db, require
 from app.domain.access import Permission
 from app.schemas.recommendation import CompleteAssessmentResponse, RecommendationOut
+from app.schemas.template import AssessmentOut, CreateAssessmentRequest, SaveResponsesRequest
 from app.services.assessment_service import AssessmentService
 
 router = APIRouter(tags=["Assessments"])
+
+
+@router.post("/assessments", status_code=status.HTTP_201_CREATED, response_model=AssessmentOut)
+def create_assessment(
+    body: CreateAssessmentRequest,
+    _scope=Depends(require(Permission.ASSESSMENT_COMPLETE)),
+    caller: CallerContext = Depends(get_caller),
+    db: Session = Depends(get_db),
+    svc: AssessmentService = Depends(get_assessment_service),
+) -> AssessmentOut:
+    """Start an assessment in the caller's org from a published template (Module 3)."""
+    a = svc.create_from_template(caller.principal, caller.organization_id, body.template_id)
+    db.commit()
+    return AssessmentOut.from_domain(a)
+
+
+@router.put("/assessments/{assessment_id}/responses", status_code=status.HTTP_204_NO_CONTENT)
+def save_responses(
+    assessment_id: str,
+    body: SaveResponsesRequest,
+    _scope=Depends(require(Permission.ASSESSMENT_COMPLETE)),
+    caller: CallerContext = Depends(get_caller),
+    db: Session = Depends(get_db),
+    svc: AssessmentService = Depends(get_assessment_service),
+) -> None:
+    svc.save_responses(
+        caller.principal,
+        caller.organization_id,
+        assessment_id,
+        [r.model_dump() for r in body.responses],
+    )
+    db.commit()
 
 
 @router.post(

@@ -19,8 +19,17 @@ import {
   RecommendationList,
   RecommendationOut,
   ReportOut,
+  TemplateList,
+  type Template,
   type Recommendation,
 } from "./schemas";
+
+interface TemplateInput {
+  category: string;
+  title: string;
+  description?: string;
+  sections: { title: string; questions: { key: string; prompt: string; type: string }[] }[];
+}
 
 interface RecommendationPatch {
   title?: string;
@@ -146,5 +155,45 @@ export function useReport(assessmentId: string, enabled: boolean) {
       const data = await getJson(`/api/assessments/${assessmentId}/report`);
       return data ? ReportOut.parse(data) : null;
     },
+  });
+}
+
+
+export function useTemplates() {
+  return useQuery<Template[]>({
+    queryKey: ["templates"],
+    queryFn: async () => TemplateList.parse(await getJson("/api/templates")),
+  });
+}
+
+export function useCreateTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: TemplateInput) =>
+      getJson("/api/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["templates"] }),
+  });
+}
+
+export function usePublishTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => getJson(`/api/templates/${id}/publish`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["templates"] }),
+  });
+}
+
+export function useStartAssessment() {
+  return useMutation({
+    mutationFn: async (templateId: string) =>
+      getJson("/api/assessments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template_id: templateId }),
+      }),
   });
 }
