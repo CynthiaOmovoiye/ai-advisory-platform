@@ -16,6 +16,9 @@ class ObjectStorage(Protocol):
     def put(self, key: str, data: bytes, content_type: str) -> None: ...
     def get(self, key: str) -> bytes: ...
     def presigned_url(self, key: str, expires_seconds: int = 900) -> str: ...
+    def ping(self) -> bool:
+        """Best-effort reachability check for /readyz."""
+        ...
 
 
 @dataclass
@@ -33,6 +36,9 @@ class InMemoryStorage:
     def presigned_url(self, key: str, expires_seconds: int = 900) -> str:
         # A stand-in; the real impl returns a signed, time-boxed S3/MinIO URL.
         return f"memory://{key}?expires={expires_seconds}"
+
+    def ping(self) -> bool:
+        return True
 
 
 class S3Storage:
@@ -80,3 +86,10 @@ class S3Storage:
         return self._c().generate_presigned_url(
             "get_object", Params={"Bucket": self._bucket, "Key": key}, ExpiresIn=expires_seconds
         )
+
+    def ping(self) -> bool:  # pragma: no cover - requires a live endpoint
+        try:
+            self._c().head_bucket(Bucket=self._bucket)
+            return True
+        except Exception:
+            return False

@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # worker use this. Falls back to database_url when a separate role isn't configured.
     app_database_url: str = ""
 
+    # Redis (rate limiting + Celery broker). Empty ⇒ rate limiting uses an in-process
+    # fallback (fine for single-process dev/tests; Redis is needed for multi-replica).
+    redis_url: str = ""
+
     # Shared secret used to verify the session token minted by the Next.js BFF after it
     # validates the Auth.js session (ADR-0009). Empty ⇒ auth fails closed.
     auth_secret: str = ""
