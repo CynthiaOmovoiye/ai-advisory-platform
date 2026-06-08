@@ -1,0 +1,54 @@
+{
+  "name": "baseline-readiness",
+  "version": 1,
+  "description": "Gold cases for the baseline ruleset. Each item pins assessment facts to the exact set of finding codes the engine must produce (ADR-0005).",
+  "items": [
+    {
+      "input": {
+        "facts": {
+          "mfa_enabled": false,
+          "sensitive_data_present": true,
+          "ai_governance_owner": "none",
+          "data_quality_score": 2,
+          "dpia_completed": false,
+          "planned_capabilities": ["rag", "agents"]
+        }
+      },
+      "expected": {
+        "finding_codes": ["COMP-PII-004", "SEC-MFA-001", "GOV-OWN-002", "DATA-QLT-003", "OPS-OBS-005", "INF-VEC-006"]
+      }
+    },
+    {
+      "input": {
+        "facts": {
+          "mfa_enabled": true,
+          "sensitive_data_present": true,
+          "ai_governance_owner": "ciso",
+          "data_quality_score": 5,
+          "dpia_completed": true,
+          "model_monitoring": "datadog",
+          "planned_capabilities": ["batch_scoring"]
+        }
+      },
+      "expected": {
+        "finding_codes": []
+      }
+    },
+    {
+      "input": {
+        "facts": {
+          "mfa_enabled": false,
+          "sensitive_data_present": false,
+          "ai_governance_owner": "none",
+          "data_quality_score": 4,
+          "dpia_completed": true,
+          "model_monitoring": "prometheus",
+          "planned_capabilities": []
+        }
+      },
+      "expected": {
+        "finding_codes": ["GOV-OWN-002"]
+      }
+    }
+  ]
+}

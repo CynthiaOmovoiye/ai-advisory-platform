@@ -1,0 +1,90 @@
+{
+  "name": "baseline",
+  "version": 1,
+  "rules": [
+    {
+      "code": "SEC-MFA-001",
+      "category": "security",
+      "severity": "high",
+      "condition": {
+        "op": "and",
+        "args": [
+          { "op": "eq", "key": "mfa_enabled", "value": false },
+          { "op": "eq", "key": "sensitive_data_present", "value": true }
+        ]
+      },
+      "recommendation_template": {
+        "title": "Enforce multi-factor authentication",
+        "body": "Sensitive data is present but MFA is not enforced. Require MFA for all users with access to sensitive systems before any AI initiative ingests that data.",
+        "references": ["NIST SP 800-63B", "CIS Control 6"]
+      },
+      "priority": 10
+    },
+    {
+      "code": "GOV-OWN-002",
+      "category": "governance",
+      "severity": "medium",
+      "condition": { "op": "eq", "key": "ai_governance_owner", "value": "none" },
+      "recommendation_template": {
+        "title": "Assign an accountable AI governance owner",
+        "body": "No accountable owner exists for AI governance. Designate a named owner responsible for AI risk, policy, and oversight.",
+        "references": ["ISO/IEC 42001"]
+      },
+      "priority": 20
+    },
+    {
+      "code": "DATA-QLT-003",
+      "category": "data_maturity",
+      "severity": "medium",
+      "condition": { "op": "lt", "key": "data_quality_score", "value": 3 },
+      "recommendation_template": {
+        "title": "Improve data quality before model adoption",
+        "body": "Reported data quality score is {data_quality_score}/5, below the threshold for reliable AI outcomes. Establish data quality SLAs and remediation before adoption.",
+        "references": ["DAMA-DMBOK"]
+      },
+      "priority": 30
+    },
+    {
+      "code": "COMP-PII-004",
+      "category": "compliance",
+      "severity": "critical",
+      "condition": {
+        "op": "and",
+        "args": [
+          { "op": "eq", "key": "sensitive_data_present", "value": true },
+          { "op": "eq", "key": "dpia_completed", "value": false }
+        ]
+      },
+      "recommendation_template": {
+        "title": "Complete a Data Protection Impact Assessment",
+        "body": "Sensitive/personal data is in scope but no DPIA has been completed. A DPIA is required before processing this data in an AI system.",
+        "references": ["GDPR Art. 35"]
+      },
+      "priority": 5
+    },
+    {
+      "code": "OPS-OBS-005",
+      "category": "operations",
+      "severity": "low",
+      "condition": { "op": "not", "arg": { "op": "exists", "key": "model_monitoring" } },
+      "recommendation_template": {
+        "title": "Plan for model monitoring and observability",
+        "body": "No model monitoring approach is defined. Define latency, cost, quality, and drift monitoring before production deployment.",
+        "references": ["Google SRE Workbook"]
+      },
+      "priority": 40
+    },
+    {
+      "code": "INF-VEC-006",
+      "category": "infrastructure",
+      "severity": "info",
+      "condition": { "op": "contains", "key": "planned_capabilities", "value": "rag" },
+      "recommendation_template": {
+        "title": "Provision vector search capability for planned RAG",
+        "body": "RAG is a planned capability. Ensure a vector store (e.g. pgvector) and an embedding/ingestion pipeline are accounted for in the architecture.",
+        "references": []
+      },
+      "priority": 50
+    }
+  ]
+}

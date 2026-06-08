@@ -1,0 +1,45 @@
+[project]
+name = "ai-advisory-platform-backend"
+version = "0.1.0"
+description = "AI Advisory Platform — backend (FastAPI). This slice ships the pure-domain rule engine, grounding check, LLM provider interface, and evaluation framework."
+requires-python = ">=3.12"
+# The domain core (rules engine, grounding, eval, access kernel) is pure-stdlib and
+# runs/tests with ZERO of these (ADR-0002 — the domain layer has no I/O). The app
+# (API + persistence + OpenRouter client) needs them:
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "httpx>=0.27",            # OpenRouter client
+    "uvicorn>=0.30",
+    # added when the worker/cache phases land:
+    # "celery>=5.4", "redis>=5.0", "psycopg[binary]>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5", "black>=24.4", "mypy>=1.10"]
+# Postgres driver for running against a real database (tests use SQLite):
+postgres = ["psycopg[binary]>=3.1"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]          # so `from app...` / `from tests...` resolve
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]   # incl. bugbear + bandit security lints
+ignore = ["S101"]                          # asserts are fine in tests
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
