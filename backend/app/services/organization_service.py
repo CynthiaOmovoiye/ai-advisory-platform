@@ -100,7 +100,7 @@ class OrganizationService:
     def list_members(self, principal: Principal, organization_id: str) -> list[MemberRecord]:
         authorize(principal, Permission.MEMBER_MANAGE, organization_id)
         scope = TenantScope(organization_id=organization_id, acting_user_id=principal.user_id)
-        return self.members.list(scope)
+        return self.members.list_all(scope)
 
     def remove_member(
         self, principal: Principal, organization_id: str, member_id: str

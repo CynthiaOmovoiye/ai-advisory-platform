@@ -37,7 +37,7 @@ class InMemoryAssessmentRepository:
             return None
         return record
 
-    def list(self, scope: TenantScope) -> list[AssessmentRecord]:
+    def list_all(self, scope: TenantScope) -> list[AssessmentRecord]:
         return [r for r in self._by_id.values() if scope.owns(r.organization_id)]
 
     def set_status(self, assessment_id: str, status: str, scope: TenantScope) -> AssessmentRecord:

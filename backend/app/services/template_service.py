@@ -77,7 +77,7 @@ class TemplateService:
 
     def list_templates(self, principal: Principal, active_org: str) -> list[TemplateRecord]:
         authorize(principal, Permission.ASSESSMENT_READ, active_org)
-        return self.templates.list()
+        return self.templates.list_all()
 
     def get_template(
         self, principal: Principal, active_org: str, template_id: str

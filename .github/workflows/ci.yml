@@ -35,14 +35,18 @@ jobs:
       - name: Ruff format check
         run: ruff format --check .
 
+      - name: Type check (mypy)
+        run: mypy app
+
       - name: Tests
         # The whole suite is hermetic: httpx MockTransport, SQLite, FastAPI TestClient,
         # and a fake PDF renderer — no network, no database, no API key.
         run: pytest -q
 
-      - name: Migrations apply cleanly
+      - name: Migrations apply + ORM drift check
         run: |
           DATABASE_URL="sqlite+pysqlite:///./ci.db" python -m alembic upgrade head
+          DATABASE_URL="sqlite+pysqlite:///./ci.db" python scripts/check_migrations.py
 
   frontend:
     name: Frontend (build + typecheck)

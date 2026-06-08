@@ -93,8 +93,8 @@ class TestSqlRepositories(unittest.TestCase):
 
     def test_list_is_scoped(self):
         repo = SqlAssessmentRepository(self.session)
-        self.assertEqual([r.id for r in repo.list(TenantScope(ORG_A, "u-a"))], ["assess-a"])
-        self.assertEqual([r.id for r in repo.list(TenantScope(ORG_B, "u-b"))], ["assess-b"])
+        self.assertEqual([r.id for r in repo.list_all(TenantScope(ORG_A, "u-a"))], ["assess-a"])
+        self.assertEqual([r.id for r in repo.list_all(TenantScope(ORG_B, "u-b"))], ["assess-b"])
 
     def test_service_runs_against_sql_backend_unchanged(self):
         svc = AssessmentService(

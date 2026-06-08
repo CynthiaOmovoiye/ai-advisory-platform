@@ -144,7 +144,7 @@ class RecommendationRow(Base):
     grounding_reasons = mapped_column(JSONType, nullable=False, default=list)
     # consultant-workspace lifecycle
     status: Mapped[str] = mapped_column(String, nullable=False, default="draft")
-    edited_by: Mapped[str] = mapped_column(String, nullable=True)
+    edited_by: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class ReportRow(Base):
@@ -158,7 +158,7 @@ class ReportRow(Base):
     )
     title: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="draft")
-    pdf_storage_key: Mapped[str] = mapped_column(String, nullable=True)
+    pdf_storage_key: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class EvaluationRunRow(Base):

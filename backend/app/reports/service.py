@@ -76,8 +76,9 @@ class ReportService:
     def generate(
         self, scope: TenantScope, assessment_id: str, *, organization_name: str
     ) -> ReportRecord:
-        self.validate_publishable(scope, assessment_id)
+        self.validate_publishable(scope, assessment_id)  # raises if assessment is missing
         assessment = self.assessments.get(assessment_id, scope)
+        assert assessment is not None  # guaranteed by validate_publishable above
         recs = self.recommendations.list_for_assessment(assessment_id, scope)
         approved = [r for r in recs if r.status == "approved"]
 

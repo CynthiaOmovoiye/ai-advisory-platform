@@ -142,7 +142,7 @@ class AssessmentService:
     ) -> list[AssessmentRecord]:
         authorize(principal, Permission.ASSESSMENT_READ, organization_id)
         scope = TenantScope(organization_id=organization_id, acting_user_id=principal.user_id)
-        return self.assessments.list(scope)
+        return self.assessments.list_all(scope)
 
     def get_assessment(
         self, principal: Principal, organization_id: str, assessment_id: str

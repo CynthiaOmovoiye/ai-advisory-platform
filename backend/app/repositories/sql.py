@@ -66,7 +66,7 @@ class SqlAssessmentRepository:
         ).scalar_one_or_none()
         return _to_record(row) if row is not None else None
 
-    def list(self, scope: TenantScope) -> list[AssessmentRecord]:
+    def list_all(self, scope: TenantScope) -> list[AssessmentRecord]:
         rows = self._s.execute(
             select(Assessment).where(Assessment.organization_id == scope.organization_id)
         ).scalars()
@@ -370,7 +370,7 @@ class SqlMemberRepository:
         )
         self._s.flush()
 
-    def list(self, scope: TenantScope) -> list[MemberRecord]:
+    def list_all(self, scope: TenantScope) -> list[MemberRecord]:
         rows = self._s.execute(
             select(OrganizationMember)
             .where(OrganizationMember.organization_id == scope.organization_id)
@@ -493,7 +493,7 @@ class SqlTemplateRepository:
         self._s.add(row)
         self._s.flush()
 
-    def list(self) -> list[TemplateRecord]:
+    def list_all(self) -> list[TemplateRecord]:
         rows = self._s.execute(
             select(AssessmentTemplate).order_by(AssessmentTemplate.title)
         ).scalars()

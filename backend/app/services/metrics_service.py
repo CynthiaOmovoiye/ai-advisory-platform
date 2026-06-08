@@ -50,9 +50,12 @@ class SqlMetricsRepository:
         orgs = s.scalar(select(func.count()).select_from(Organization)) or 0
 
         assessments_total = s.scalar(select(func.count()).select_from(Assessment)) or 0
-        by_status = dict(
-            s.execute(select(Assessment.status, func.count()).group_by(Assessment.status)).all()
-        )
+        by_status: dict[str, int] = {
+            str(k): int(v)
+            for k, v in s.execute(
+                select(Assessment.status, func.count()).group_by(Assessment.status)
+            ).all()
+        }
 
         reports_published = (
             s.scalar(
@@ -62,11 +65,12 @@ class SqlMetricsRepository:
         )
 
         rec_total = s.scalar(select(func.count()).select_from(RecommendationRow)) or 0
-        by_source = dict(
-            s.execute(
+        by_source: dict[str, int] = {
+            str(k): int(v)
+            for k, v in s.execute(
                 select(RecommendationRow.source, func.count()).group_by(RecommendationRow.source)
             ).all()
-        )
+        }
         grounded = (
             s.scalar(
                 select(func.count())
@@ -98,11 +102,11 @@ class SqlMetricsRepository:
         return AdminMetrics(
             organizations=orgs,
             assessments_total=assessments_total,
-            assessments_by_status={str(k): int(v) for k, v in by_status.items()},
+            assessments_by_status=by_status,
             reports_published=reports_published,
             ai_usage={
                 "recommendations_total": rec_total,
-                "by_source": {str(k): int(v) for k, v in by_source.items()},
+                "by_source": by_source,
                 "grounding_pass_rate": round(grounded / llm_attempted, 4)
                 if llm_attempted
                 else None,

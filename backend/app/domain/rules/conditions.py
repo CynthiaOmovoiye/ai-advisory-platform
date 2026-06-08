@@ -27,7 +27,6 @@ Condition tree shape (matches ``rules.condition`` JSONB in db/schema.sql)::
 from __future__ import annotations
 
 from collections.abc import Mapping
-from numbers import Number
 from typing import Any
 
 MAX_DEPTH = 32  # bound recursion; a hostile/buggy rule cannot exhaust the stack
@@ -115,7 +114,14 @@ def evaluate_condition(node: Mapping[str, Any], facts: Mapping[str, Any], _depth
         # absent key is treated as "not equal" — a missing control is not the value.
         return (not present) or actual != expected
     if op in {"gt", "gte", "lt", "lte"}:
-        if not (_is_num(actual) and _is_num(expected)):
+        # Inline the numeric guard (rather than a helper) so the type narrows: bool is
+        # excluded because it subclasses int and we don't want True to compare as 1.
+        if (
+            not isinstance(actual, (int, float))
+            or isinstance(actual, bool)
+            or not isinstance(expected, (int, float))
+            or isinstance(expected, bool)
+        ):
             return False  # type mismatch -> no match, never an exception
         if op == "gt":
             return actual > expected
@@ -125,16 +131,11 @@ def evaluate_condition(node: Mapping[str, Any], facts: Mapping[str, Any], _depth
             return actual < expected
         return actual <= expected
     if op == "in":
-        return present and actual in expected
+        return present and isinstance(expected, (list, tuple, set, str)) and actual in expected
     if op == "contains":
         return present and _safe_contains(actual, expected)
 
     return False  # unreachable for validated trees
-
-
-def _is_num(v: Any) -> bool:
-    # bool is a subclass of int; exclude it from numeric comparisons.
-    return isinstance(v, Number) and not isinstance(v, bool)
 
 
 def _safe_contains(container: Any, value: Any) -> bool:
