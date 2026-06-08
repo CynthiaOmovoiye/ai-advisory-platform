@@ -18,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/" className="text-lg font-semibold">AI Advisory Platform</a>
               <nav className="flex gap-4 text-sm text-slate-600">
                 <a href="/assessments" className="hover:text-slate-900">Assessments</a>
+                <a href="/members" className="hover:text-slate-900">Members</a>
                 <a href="/admin" className="hover:text-slate-900">Admin</a>
                 <a href="/eval" className="hover:text-slate-900">Evaluation</a>
               </nav>

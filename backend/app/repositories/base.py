@@ -96,3 +96,41 @@ class ReportRecord:
 class ReportRepository(Protocol):
     def save(self, report: ReportRecord, scope: TenantScope) -> None: ...
     def get_for_assessment(self, assessment_id: str, scope: TenantScope) -> ReportRecord | None: ...
+
+
+@dataclass(frozen=True)
+class OrganizationRecord:
+    id: str
+    name: str
+    slug: str
+
+
+@dataclass(frozen=True)
+class MemberRecord:
+    id: str
+    organization_id: str
+    invited_email: str
+    role: str
+    status: str
+    user_id: str | None = None
+
+
+class OrganizationRepository(Protocol):
+    def create(self, record: OrganizationRecord) -> None: ...
+    def get(self, organization_id: str) -> OrganizationRecord | None: ...
+    def slug_exists(self, slug: str) -> bool: ...
+
+
+class MemberRepository(Protocol):
+    def add(
+        self,
+        member: MemberRecord,
+        scope: TenantScope,
+        *,
+        invite_token_hash: str | None,
+        invited_by: str,
+    ) -> None: ...
+    def list(self, scope: TenantScope) -> list[MemberRecord]: ...
+    def get(self, member_id: str, scope: TenantScope) -> MemberRecord | None: ...
+    def set_status(self, member_id: str, status: str, scope: TenantScope) -> MemberRecord: ...
+    def email_exists(self, email: str, scope: TenantScope) -> bool: ...

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infra.db import Base, JSONType
@@ -27,6 +27,24 @@ class Organization(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+
+
+class OrganizationMember(Base):
+    __tablename__ = "organization_members"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "invited_email", name="uq_member_org_email"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    user_id: Mapped[str] = mapped_column(String, nullable=True)  # null until invite accepted
+    invited_email: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False, default="org_user")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="invited")
+    invited_by: Mapped[str] = mapped_column(String, nullable=True)
+    invite_token_hash: Mapped[str] = mapped_column(String, nullable=True)  # store hash, never raw
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class Assessment(Base):

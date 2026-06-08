@@ -43,12 +43,15 @@ from app.repositories.sql import (
     SqlAssessmentRepository,
     SqlAuditSink,
     SqlEvaluationRunRepository,
+    SqlMemberRepository,
+    SqlOrganizationRepository,
     SqlRecommendationRepository,
     SqlReportRepository,
 )
 from app.services.assessment_service import AssessmentService
 from app.services.evaluation_service import EvaluationService
 from app.services.metrics_service import SqlMetricsRepository
+from app.services.organization_service import OrganizationService
 from app.services.recommendation_service import RecommendationService
 
 _DATA = Path(__file__).resolve().parents[2] / "data"
@@ -206,6 +209,14 @@ def get_evaluation_service(
 
 def get_metrics_repository(db: Session = Depends(get_db)) -> SqlMetricsRepository:
     return SqlMetricsRepository(db)
+
+
+def get_organization_service(db: Session = Depends(get_db)) -> OrganizationService:
+    return OrganizationService(
+        organizations=SqlOrganizationRepository(db),
+        members=SqlMemberRepository(db),
+        audit=SqlAuditSink(db),
+    )
 
 
 def baseline_eval_dataset() -> tuple:

@@ -25,3 +25,6 @@ frontend/tsconfig.lib.json
 .DS_Store
 .idea/
 .vscode/
+
+# Local dev compose override (bind-mount + reload)
+docker-compose.override.yml

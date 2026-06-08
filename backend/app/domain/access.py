@@ -44,6 +44,9 @@ class Permission(str, Enum):
     RULE_READ = "rule:read"
     RULE_EDIT = "rule:edit"
     ADMIN_METRICS = "admin:metrics"
+    ORGANIZATION_CREATE = "organization:create"
+    MEMBER_MANAGE = "member:manage"
+    TEMPLATE_MANAGE = "template:manage"
 
 
 # Role → granted permissions. The single source of truth for "who may do what".
@@ -58,6 +61,9 @@ _POLICY: Mapping[Role, frozenset[Permission]] = {
             Permission.RECOMMENDATION_APPROVE,
             Permission.REPORT_PUBLISH,
             Permission.RULE_READ,
+            Permission.ORGANIZATION_CREATE,
+            Permission.MEMBER_MANAGE,
+            Permission.TEMPLATE_MANAGE,
         }
     ),
     Role.ORG_USER: frozenset(

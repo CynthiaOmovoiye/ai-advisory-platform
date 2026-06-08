@@ -11,6 +11,11 @@ import {
   CompleteAssessmentResponse,
   EvaluationRun,
   EvaluationRunList,
+  MemberList,
+  type Member,
+  InviteMemberResponse,
+  OrganizationOut,
+  type Organization,
   RecommendationList,
   RecommendationOut,
   ReportOut,
@@ -118,4 +123,33 @@ export async function triggerEvaluation(identity: SessionIdentity): Promise<Eval
 
 export async function listEvaluationRuns(identity: SessionIdentity): Promise<EvaluationRun[]> {
   return EvaluationRunList.parse(await request(identity, `/evaluation/runs`));
+}
+
+
+export async function listMembers(identity: SessionIdentity): Promise<Member[]> {
+  return MemberList.parse(await request(identity, `/members`));
+}
+
+export async function inviteMember(
+  identity: SessionIdentity,
+  email: string,
+  role: "org_user" | "consultant",
+): Promise<{ member: Member; invite_token: string }> {
+  return InviteMemberResponse.parse(
+    await request(identity, `/members`, { method: "POST", body: JSON.stringify({ email, role }) }),
+  );
+}
+
+export async function removeMember(identity: SessionIdentity, memberId: string): Promise<Member> {
+  return MemberList.element.parse(await request(identity, `/members/${memberId}`, { method: "DELETE" }));
+}
+
+export async function createOrganization(
+  identity: SessionIdentity,
+  name: string,
+  slug: string,
+): Promise<Organization> {
+  return OrganizationOut.parse(
+    await request(identity, `/organizations`, { method: "POST", body: JSON.stringify({ name, slug }) }),
+  );
 }

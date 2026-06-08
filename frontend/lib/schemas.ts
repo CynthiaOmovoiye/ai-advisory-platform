@@ -83,6 +83,28 @@ export type CompleteAssessmentResponse = z.infer<typeof CompleteAssessmentRespon
 
 export const RecommendationList = z.array(RecommendationOut);
 
+export const MemberOut = z.object({
+  id: z.string(),
+  invited_email: z.string(),
+  role: z.string(),
+  status: z.string(),
+});
+export type Member = z.infer<typeof MemberOut>;
+export const MemberList = z.array(MemberOut);
+
+export const InviteMemberResponse = z.object({
+  member: MemberOut,
+  invite_token: z.string(),
+});
+export type InviteMemberResponse = z.infer<typeof InviteMemberResponse>;
+
+export const OrganizationOut = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+});
+export type Organization = z.infer<typeof OrganizationOut>;
+
 /** Sanitized error envelope (matches the backend `Error` schema). */
 export const ApiError = z.object({
   code: z.string(),

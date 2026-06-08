@@ -25,11 +25,19 @@ from sqlalchemy.orm import Session
 from app.domain.rules.models import Severity
 from app.llm.enhancement import Recommendation
 
-from .base import AssessmentRecord, ReportRecord, TenantScope
+from .base import (
+    AssessmentRecord,
+    MemberRecord,
+    OrganizationRecord,
+    ReportRecord,
+    TenantScope,
+)
 from .orm import (
     Assessment,
     AuditLogRow,
     EvaluationRunRow,
+    Organization,
+    OrganizationMember,
     RecommendationRow,
     ReportRow,
 )
@@ -273,4 +281,102 @@ def _to_recommendation(row: RecommendationRow) -> Recommendation:
         status=row.status,
         id=row.id,
         edited_by=row.edited_by,
+    )
+
+
+class SqlOrganizationRepository:
+    def __init__(self, session: Session) -> None:
+        self._s = session
+
+    def create(self, record: OrganizationRecord) -> None:
+        self._s.add(Organization(id=record.id, name=record.name, slug=record.slug))
+        self._s.flush()
+
+    def get(self, organization_id: str) -> OrganizationRecord | None:
+        row = self._s.get(Organization, organization_id)
+        return OrganizationRecord(id=row.id, name=row.name, slug=row.slug) if row else None
+
+    def slug_exists(self, slug: str) -> bool:
+        return (
+            self._s.execute(select(Organization.id).where(Organization.slug == slug)).first()
+            is not None
+        )
+
+
+class SqlMemberRepository:
+    def __init__(self, session: Session) -> None:
+        self._s = session
+
+    def add(
+        self,
+        member: MemberRecord,
+        scope: TenantScope,
+        *,
+        invite_token_hash: str | None,
+        invited_by: str,
+    ) -> None:
+        self._s.add(
+            OrganizationMember(
+                id=member.id,
+                organization_id=scope.organization_id,  # scope owns the org, not request input
+                user_id=member.user_id,
+                invited_email=member.invited_email,
+                role=member.role,
+                status=member.status,
+                invited_by=invited_by,
+                invite_token_hash=invite_token_hash,
+            )
+        )
+        self._s.flush()
+
+    def list(self, scope: TenantScope) -> list[MemberRecord]:
+        rows = self._s.execute(
+            select(OrganizationMember)
+            .where(OrganizationMember.organization_id == scope.organization_id)
+            .order_by(OrganizationMember.created_at)
+        ).scalars()
+        return [_to_member(r) for r in rows]
+
+    def get(self, member_id: str, scope: TenantScope) -> MemberRecord | None:
+        row = self._s.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.id == member_id,
+                OrganizationMember.organization_id == scope.organization_id,  # tenant filter
+            )
+        ).scalar_one_or_none()
+        return _to_member(row) if row else None
+
+    def set_status(self, member_id: str, status: str, scope: TenantScope) -> MemberRecord:
+        row = self._s.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.id == member_id,
+                OrganizationMember.organization_id == scope.organization_id,
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise KeyError(member_id)
+        row.status = status
+        self._s.flush()
+        return _to_member(row)
+
+    def email_exists(self, email: str, scope: TenantScope) -> bool:
+        return (
+            self._s.execute(
+                select(OrganizationMember.id).where(
+                    OrganizationMember.organization_id == scope.organization_id,
+                    OrganizationMember.invited_email == email,
+                )
+            ).first()
+            is not None
+        )
+
+
+def _to_member(row: OrganizationMember) -> MemberRecord:
+    return MemberRecord(
+        id=row.id,
+        organization_id=row.organization_id,
+        invited_email=row.invited_email,
+        role=row.role,
+        status=row.status,
+        user_id=row.user_id,
     )

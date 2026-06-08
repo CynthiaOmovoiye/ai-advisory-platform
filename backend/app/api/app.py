@@ -13,7 +13,14 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import admin, assessments, evaluation, recommendations, reports
+from app.api.v1 import (
+    admin,
+    assessments,
+    evaluation,
+    organizations,
+    recommendations,
+    reports,
+)
 from app.errors import AppError
 
 SECURE_HEADERS = {
@@ -79,6 +86,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(assessments.router, prefix="/v1")
+    app.include_router(organizations.router, prefix="/v1")
     app.include_router(recommendations.router, prefix="/v1")
     app.include_router(reports.router, prefix="/v1")
     app.include_router(admin.router, prefix="/v1")

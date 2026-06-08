@@ -14,6 +14,8 @@ import {
   CompleteAssessmentResponse,
   EvaluationRun,
   EvaluationRunList,
+  MemberList,
+  type Member,
   RecommendationList,
   RecommendationOut,
   ReportOut,
@@ -101,5 +103,34 @@ export function useTriggerEvaluation() {
     mutationFn: async () =>
       EvaluationRun.parse(await getJson("/api/evaluation/runs", { method: "POST" })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["evaluation-runs"] }),
+  });
+}
+
+
+export function useMembers() {
+  return useQuery<Member[]>({
+    queryKey: ["members"],
+    queryFn: async () => MemberList.parse(await getJson("/api/members")),
+  });
+}
+
+export function useInviteMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { email: string; role: "org_user" | "consultant" }) =>
+      getJson("/api/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(args),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["members"] }),
+  });
+}
+
+export function useRemoveMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => getJson(`/api/members/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["members"] }),
   });
 }
