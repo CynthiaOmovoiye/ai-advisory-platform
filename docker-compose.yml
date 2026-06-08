@@ -96,10 +96,12 @@ services:
       # match the backend's so the signed session token verifies (ADR-0009).
       API_BASE_URL: http://api:8000/v1
       AUTH_SECRET: ${AUTH_SECRET:-change-me-32-bytes-min-shared-secret}
-      AUTH_URL: http://localhost:3000
+      # Auth.js needs its public origin. Tracks WEB_PORT so overriding the host port
+      # (below) keeps sign-in and the BFF callbacks pointing at the right place.
+      AUTH_URL: http://localhost:${WEB_PORT:-3000}
     depends_on:
       api: { condition: service_healthy }
-    # Override the host port if 3000 is taken: WEB_PORT=3001 docker compose up
+    # Override the host port if 3000 is taken: WEB_PORT=3100 docker compose up
     ports: ["${WEB_PORT:-3000}:3000"]
 
 volumes:
