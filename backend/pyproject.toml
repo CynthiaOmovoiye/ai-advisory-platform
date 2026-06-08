@@ -1,3 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Only `app` is the importable package; tests/migrations/scripts/data are run in place
+# (pytest adds the repo root to the path — see [tool.pytest.ini_options].pythonpath).
+[tool.setuptools]
+packages = ["app"]
+
 [project]
 name = "ai-advisory-platform-backend"
 version = "0.1.0"
