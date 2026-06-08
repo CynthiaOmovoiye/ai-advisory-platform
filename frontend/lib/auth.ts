@@ -21,11 +21,15 @@ declare module "next-auth" {
 }
 
 // DEMO-ONLY login. It accepts any email/password and grants a global-admin session so
-// the whole UI is exercisable end-to-end. It is enabled ONLY when AUTH_DEMO_MODE !==
-// "false" (i.e. NOT in production). In production this provider is absent and login
-// requires wiring a real IdP / credential-verification path — see frontend/README.md
-// (Authentication) and ADR-0009 for the backend trust boundary.
-const demoMode = process.env.AUTH_DEMO_MODE !== "false";
+// the whole UI is exercisable end-to-end. It is **opt-in** — enabled ONLY when
+// AUTH_DEMO_MODE is exactly "true". A missing or misspelled value leaves it OFF, so the
+// production-safe default is fail-closed: no provider until a real IdP is wired (see
+// frontend/README.md "Authentication" and ADR-0009 for the backend trust boundary).
+const demoMode = process.env.AUTH_DEMO_MODE === "true";
+if (demoMode) {
+  // Loud signal so a demo build is never mistaken for a hardened one.
+  console.warn("[auth] AUTH_DEMO_MODE=true — demo login enabled (any credentials → admin).");
+}
 
 const demoProvider = Credentials({
   credentials: { email: {}, password: {} },

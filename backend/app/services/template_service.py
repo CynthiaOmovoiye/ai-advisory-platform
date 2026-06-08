@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from app.domain.access import Permission, Principal, authorize
+from app.domain.access import Permission, Principal, authorize, has_permission
 from app.errors import Conflict, NotFound
 from app.repositories.base import (
     QuestionRecord,
@@ -77,14 +77,23 @@ class TemplateService:
 
     def list_templates(self, principal: Principal, active_org: str) -> list[TemplateRecord]:
         authorize(principal, Permission.ASSESSMENT_READ, active_org)
-        return self.templates.list_all()
+        templates = self.templates.list_all()
+        # Drafts (and archived) are authoring artifacts — only authors see them; ordinary
+        # readers see published templates (the ones they can start an assessment from).
+        if has_permission(principal, Permission.TEMPLATE_MANAGE, active_org):
+            return templates
+        return [t for t in templates if t.status == "published"]
 
     def get_template(
         self, principal: Principal, active_org: str, template_id: str
     ) -> TemplateRecord:
         authorize(principal, Permission.ASSESSMENT_READ, active_org)
         t = self.templates.get(template_id)
-        if t is None:
+        # Don't reveal a draft's existence to a non-author (404, not 403).
+        if t is None or (
+            t.status != "published"
+            and not has_permission(principal, Permission.TEMPLATE_MANAGE, active_org)
+        ):
             raise NotFound("template not found")
         return t
 

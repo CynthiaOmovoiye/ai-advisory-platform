@@ -44,3 +44,10 @@ class NotFound(AppError):
 class Conflict(AppError):
     code = "conflict"
     http_status = 409
+
+
+class Unprocessable(AppError):
+    """Well-formed request that fails a semantic/domain validation (HTTP 422)."""
+
+    code = "unprocessable_entity"
+    http_status = 422

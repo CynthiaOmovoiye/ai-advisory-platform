@@ -135,6 +135,45 @@ class TestTemplates(unittest.TestCase):
         with self.assertRaises(NotFound):
             self.assessments.get_assessment(consultant, ORG, "nope")
 
+    def test_save_responses_rejects_unknown_key(self):
+        from app.errors import Unprocessable
+
+        t = self.templates.create_template(consultant, ORG, **TEMPLATE_PAYLOAD)
+        self.templates.publish_template(consultant, ORG, t.id)
+        a = self.assessments.create_from_template(consultant, ORG, t.id)
+        # a key the template never asked for must be rejected (422)
+        with self.assertRaises(Unprocessable):
+            self.assessments.save_responses(
+                consultant, ORG, a.id, [{"key": "totally_made_up", "value": True}]
+            )
+
+    def test_save_responses_accepts_template_keys(self):
+        t = self.templates.create_template(consultant, ORG, **TEMPLATE_PAYLOAD)
+        self.templates.publish_template(consultant, ORG, t.id)
+        a = self.assessments.create_from_template(consultant, ORG, t.id)
+        self.assessments.save_responses(
+            consultant, ORG, a.id, [{"key": "mfa_enabled", "value": False}]
+        )  # no error
+
+    def test_draft_templates_hidden_from_ordinary_readers(self):
+        # consultant authors a draft + a published template
+        draft = self.templates.create_template(consultant, ORG, **TEMPLATE_PAYLOAD)
+        pub = self.templates.create_template(
+            consultant, ORG, **{**TEMPLATE_PAYLOAD, "title": "Published One"}
+        )
+        self.templates.publish_template(consultant, ORG, pub.id)
+
+        # an org_user (ASSESSMENT_READ, no TEMPLATE_MANAGE) sees only the published one
+        seen = self.templates.list_templates(org_user, ORG)
+        seen_ids = {t.id for t in seen}
+        self.assertIn(pub.id, seen_ids)
+        self.assertNotIn(draft.id, seen_ids)
+        # and cannot fetch the draft directly (404, not a leak)
+        with self.assertRaises(NotFound):
+            self.templates.get_template(org_user, ORG, draft.id)
+        # the author still sees it
+        self.assertIn(draft.id, {t.id for t in self.templates.list_templates(consultant, ORG)})
+
 
 if __name__ == "__main__":
     unittest.main()

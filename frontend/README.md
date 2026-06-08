@@ -62,9 +62,10 @@ npm run typecheck               # tsc --noEmit
 
 **The login is demo-only.** The Auth.js Credentials provider accepts any
 email/password and issues a **global-admin** session so the entire UI is exercisable
-end-to-end. It is enabled only when `AUTH_DEMO_MODE !== "false"` — i.e. **not in
-production**. With `AUTH_DEMO_MODE=false`, no provider is registered and login fails
-closed until a real one is wired.
+end-to-end. It is **opt-in**: enabled only when `AUTH_DEMO_MODE` is exactly `"true"`.
+Any other value — including missing or misspelled — leaves it **off** (fail-closed), so
+no provider is registered and login fails until a real one is wired. The bundled Docker
+demo sets `AUTH_DEMO_MODE=true` deliberately; a real deployment must not.
 
 What **is** production-shaped (and implemented):
 

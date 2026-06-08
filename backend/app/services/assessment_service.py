@@ -18,9 +18,14 @@ import uuid
 from dataclasses import dataclass
 
 from app.domain.access import Permission, Principal, authorize
+from app.domain.response_validation import (
+    QuestionSpec,
+    ResponseValidationError,
+    validate_responses,
+)
 from app.domain.rules import engine
 from app.domain.rules.models import Ruleset, facts_from_responses
-from app.errors import Conflict, NotFound
+from app.errors import Conflict, NotFound, Unprocessable
 from app.llm.enhancement import LlmCallSink, Recommendation, enhance_findings
 from app.llm.provider import LLMProvider
 from app.repositories.base import (
@@ -81,8 +86,26 @@ class AssessmentService:
     ) -> None:
         authorize(principal, Permission.ASSESSMENT_COMPLETE, organization_id)
         scope = TenantScope(organization_id=organization_id, acting_user_id=principal.user_id)
-        if self.assessments.get(assessment_id, scope) is None:
+        assessment = self.assessments.get(assessment_id, scope)
+        if assessment is None:
             raise NotFound("assessment not found")
+
+        # Validate submitted responses against the template's questions (key + type).
+        # Skipped only for template-less assessments (created by the trusted seed, never
+        # via the API — create_from_template always sets a template).
+        if assessment.template_id and self.templates is not None:
+            template = self.templates.get(assessment.template_id)
+            if template is not None:
+                specs = [
+                    QuestionSpec(key=q.key, type=q.type, config=q.config)
+                    for section in template.sections
+                    for q in section.questions
+                ]
+                try:
+                    validate_responses(specs, responses)
+                except ResponseValidationError as exc:
+                    raise Unprocessable(str(exc)) from exc
+
         self.assessments.save_responses(assessment_id, responses, scope)
 
     def complete(

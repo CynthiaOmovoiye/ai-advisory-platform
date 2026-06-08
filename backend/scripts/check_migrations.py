@@ -11,11 +11,16 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
-from sqlalchemy import inspect
+# Make `app` importable when run directly (e.g. `python scripts/check_migrations.py`)
+# without an editable install or PYTHONPATH.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import app.repositories.orm  # noqa: F401 — registers all models on Base.metadata
-from app.infra.db import Base, make_engine
+from sqlalchemy import inspect  # noqa: E402
+
+import app.repositories.orm  # noqa: F401,E402 — registers all models on Base.metadata
+from app.infra.db import Base, make_engine  # noqa: E402
 
 
 def main() -> int:
