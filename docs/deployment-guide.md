@@ -55,8 +55,13 @@ password reset) is delivered by a pluggable provider set via `EMAIL_PROVIDER`:
 
 - `console` — logs the message (the verification/reset link appears in the API logs);
   the dev default, no credentials required.
-- `smtp` — any SMTP server. **Mailtrap** works directly: set `SMTP_HOST`,
-  `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` from your Mailtrap inbox's SMTP tab.
+- `smtp` — any SMTP server. **Mailtrap** works directly: set `SMTP_HOST`
+  (`sandbox.smtp.mailtrap.io`), `SMTP_PORT` (2525), `SMTP_USERNAME`, `SMTP_PASSWORD`
+  from your Mailtrap inbox's SMTP tab. Note the Mailtrap **free testing tier enforces a
+  tight per-second send limit** — a burst returns `550 Too many emails per second`. The
+  app treats this as a best-effort delivery failure (logged, never fatal); the user can
+  re-request the email. Keep `SMTP_HOST` and other values on their own lines with **no
+  inline `#` comment** — python-dotenv folds a trailing comment into the value.
 - `resend` — the Resend HTTP API: set `RESEND_API_KEY` and a verified `EMAIL_FROM`.
 
 `APP_BASE_URL` must be the public web URL so emailed links resolve. Local dev can also
