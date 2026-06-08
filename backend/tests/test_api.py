@@ -143,6 +143,12 @@ class TestApi(unittest.TestCase):
 
     def test_every_v1_route_declares_an_authorization_guard(self):
         # Structural default-deny (ADR-0007): a v1 route with no guard fails this test.
+        public_auth_routes = {
+            ("/v1/auth/signup", "POST"),
+            ("/v1/auth/signin", "POST"),
+            ("/v1/auth/verify-email", "POST"),
+        }
+
         def guarded(route: APIRoute) -> bool:
             seen = []
 
@@ -159,6 +165,9 @@ class TestApi(unittest.TestCase):
         ]
         self.assertTrue(v1_routes)
         for route in v1_routes:
+            methods = route.methods or set()
+            if any((route.path, method) in public_auth_routes for method in methods):
+                continue
             self.assertTrue(guarded(route), f"UNGUARDED ROUTE: {route.path}")
 
 

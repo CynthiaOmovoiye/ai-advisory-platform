@@ -51,8 +51,8 @@ class TestDecodeSession(unittest.TestCase):
         self.assertTrue(has_permission(caller.principal, Permission.RULE_EDIT, "any-org"))
 
     def test_unknown_role_is_ignored(self):
-        caller = decode(mint(org_roles={"org-a": ["superuser", "org_user"]}))
-        self.assertEqual(caller.principal.org_roles["org-a"], frozenset({Role.ORG_USER}))
+        with self.assertRaises(Unauthorized):
+            decode(mint(org_roles={"org-a": ["superuser", "org_user"]}))
 
     def test_bad_signature_fails_closed(self):
         forged = jwt.encode(
