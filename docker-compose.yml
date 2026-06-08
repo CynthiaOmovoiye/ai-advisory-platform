@@ -1,7 +1,7 @@
 # Local development topology for the AI Advisory Platform.
 # `cp .env.example .env` then `docker compose up --build` brings up the full stack:
 # Postgres (pgvector) + Redis + MinIO + the FastAPI API + Celery worker + Next.js web.
-# The api entrypoint runs Alembic migrations and seeds a demo org/assessment.
+# The api entrypoint runs Alembic migrations and seeds a real local account/org/assessment.
 
 services:
   postgres:
@@ -97,7 +97,6 @@ services:
       API_BASE_URL: http://api:8000/v1
       AUTH_SECRET: ${AUTH_SECRET:-change-me-32-bytes-min-shared-secret}
       AUTH_URL: http://localhost:3000
-      AUTH_DEMO_MODE: "true"  # demo login; set "false" in production
     depends_on:
       api: { condition: service_healthy }
     # Override the host port if 3000 is taken: WEB_PORT=3001 docker compose up

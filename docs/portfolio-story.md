@@ -175,7 +175,7 @@ this design.
 | 1 Requirements | scope, risks, this doc set's premises | thesis (rules→LLM) agreed |
 | 2 Architecture | [system-architecture](architecture/system-architecture.md), [ADRs 1–8](adr/) | boundaries reviewed |
 | 3 Database | [ERD](architecture/erd.md), [schema.sql](../db/schema.sql) | schema models all modules + future seams |
-| 4 AuthN/Z | managed auth, default-deny RBAC | every-route-guarded test |
+| 4 AuthN/Z | Auth.js sessions, persisted credentials, default-deny RBAC | signup/signin + every-route-guarded tests |
 | 5 Assessment engine | dynamic schemas, 7 categories | dynamic schema round-trips |
 | 6 Rule engine | DB-driven, editable, sandboxed conditions | unit-tested evaluator |
 | 7 AI layer | OpenRouter enhancement + grounding + fallback | grounding rejects ungrounded output |

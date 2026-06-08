@@ -69,7 +69,8 @@ erDiagram
 
 | Table | Purpose | Key fields / notes |
 |---|---|---|
-| `users` | A person. Auth credentials are managed by the auth provider; this is the app-side profile. | `email` (unique, citext), `email_verified_at`, `status`, `deleted_at` (soft). PII minimized. |
+| `users` | A person with credential auth persisted for Auth.js Credentials sign-in. | `email` (unique, citext), `password_hash` (Argon2, never returned), `name`, `email_verified_at`, `status`, `deleted_at` (soft). PII minimized. |
+| `email_verification_tokens` | Local/dev and production email-verification token boundary. | `token_hash` unique, `expires_at`, `used_at`; raw token is returned only in local dev or delivered out-of-band by email. |
 | `roles` | RBAC roles: `admin`, `consultant`, `org_user`. | seed data; `name` unique. |
 | `permissions` | Fine-grained capabilities (e.g. `report:publish`). | future-proofs RBAC beyond 3 roles. |
 | `role_permissions` | M:N roles↔permissions. | |

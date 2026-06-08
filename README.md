@@ -194,11 +194,13 @@ The `api` entrypoint runs Alembic migrations and seeds a demo org + assessment, 
 | API + OpenAPI docs | http://localhost:8000/v1 · http://localhost:8000/docs |
 | MinIO console | http://localhost:9001 |
 
-**Click-through demo:** open the web app → **Sign in** (any email/password — the demo
-provider issues an admin session for `demo-org`) → **Assessments** → open the seeded
+**Click-through demo:** the seed creates a real persisted local account:
+`demo@example.com` / `ChangeMe123!`, in `Demo Organization`, with an org-scoped
+`consultant` role. Open the web app → **Sign in** → **Assessments** → open the seeded
 assessment → **Complete** (rule engine + grounded LLM enhancement) → review and
-**approve** the findings → **Publish report** (HTML→PDF, stored in MinIO) → check the
-**Admin** and **Evaluation** dashboards.
+**approve** the findings → **Publish report** (HTML→PDF, stored in MinIO). Platform
+admin dashboards require a real `admin` role and are not granted by signup or demo
+login.
 
 For production topology, secrets, and operations see
 [`docs/deployment-guide.md`](docs/deployment-guide.md) and

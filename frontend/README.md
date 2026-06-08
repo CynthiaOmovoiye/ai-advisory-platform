@@ -8,7 +8,7 @@ React Query, Zod, and Auth.js — the stack from the design docs.
 ```
 app/
 ├── layout.tsx, providers.tsx     React Query + Auth.js session providers
-├── page.tsx, login/, assessments/  pages (list + detail)
+├── page.tsx, login/, signup/, assessments/  pages (list + detail)
 └── api/
     ├── auth/[...nextauth]/        Auth.js handler
     └── assessments/[id]/          BFF route handlers → FastAPI
@@ -16,6 +16,7 @@ components/                        SeverityBadge, RecommendationCard
 lib/
 ├── schemas.ts        Zod schemas mirroring the backend DTOs (runtime-validated boundary)
 ├── session-token.ts  mints the BFF service token (the Next side of ADR-0009)
+├── backend-auth.ts   server-only credential/signup calls to FastAPI
 ├── api.ts            server-only typed client to FastAPI
 ├── auth.ts           Auth.js config + getSessionIdentity()
 └── queries.ts        React Query hooks (client → same-origin BFF routes)
@@ -60,23 +61,22 @@ npm run typecheck               # tsc --noEmit
 
 ## Authentication
 
-**The login is demo-only.** The Auth.js Credentials provider accepts any
-email/password and issues a **global-admin** session so the entire UI is exercisable
-end-to-end. It is **opt-in**: enabled only when `AUTH_DEMO_MODE` is exactly `"true"`.
-Any other value — including missing or misspelled — leaves it **off** (fail-closed), so
-no provider is registered and login fails until a real one is wired. The bundled Docker
-demo sets `AUTH_DEMO_MODE=true` deliberately; a real deployment must not.
+Auth.js owns the browser session. Its Credentials provider calls the FastAPI auth API
+to verify persisted users with Argon2 password hashes, load active organization
+memberships, and set session claims from real data. The old demo bypass no longer
+exists: no hardcoded demo identity claims and no automatic global admin.
 
 What **is** production-shaped (and implemented):
 
+- Sign up, local-dev email verification, sign in, sign out, and active-organization
+  switching.
 - The **BFF trust boundary** ([ADR-0009](../docs/adr/0009-auth-bff-session-token.md)):
   the Next.js server mints a short-lived HS256 service token from the session and the
-  FastAPI backend verifies it (signature, issuer, audience, expiry) and maps claims to
-  a `Principal`. The browser never holds a backend token.
+  FastAPI backend verifies it (signature, issuer, audience, expiry), then reloads
+  active membership from the database. The browser never holds a backend token.
 - **Default-deny RBAC** and **tenant isolation** on every backend route.
 
-**Extension point (not built):** a real identity source — a DB-backed Auth.js user
-store with password hashing, or an external IdP (OIDC/SAML) — plugged in as the
-provider in `lib/auth.ts`. Registration, password reset, and email verification are
-part of that work and are intentionally out of scope here. No part of the docs claims
-production auth is implemented.
+Local seed credentials are real persisted credentials: `demo@example.com` /
+`ChangeMe123!`. Future work: SMTP-backed email delivery and password reset UI/token
+delivery. The token storage/service boundary exists; local dev returns verification
+tokens only because no SMTP service is required.

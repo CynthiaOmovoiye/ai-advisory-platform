@@ -39,10 +39,10 @@ The browser, uploaded files, assessment free-text, and the LLM/OpenRouter are al
 
 | Threat | Mitigation |
 |---|---|
-| Credential stuffing / brute force | Managed auth library; rate-limit + lockout on auth endpoints; strong hashing (ADR-0007). |
-| Session hijacking | httpOnly+Secure+SameSite cookies; short access tokens; **refresh-token rotation with reuse detection** revokes the session family. |
+| Credential stuffing / brute force | Argon2 password hashing, generic signin errors, and API rate limiting. Account lockout/escalated auth-specific throttling is future work. |
+| Session hijacking | Auth.js httpOnly+Secure+SameSite cookies; short-lived BFF service tokens; signout clears the session. Server-side revocation/session-versioning is future work. |
 | Forged invitation acceptance | Invite tokens stored **hashed**, single-use, time-boxed (`organization_members`). |
-| Password-reset token theft | Hashed, single-use, time-boxed; reset invalidates sessions. |
+| Password-reset token theft | Future work; planned to reuse hashed, single-use, time-boxed token storage and invalidate sessions. |
 
 ### T — Tampering (integrity)
 
@@ -71,7 +71,7 @@ The browser, uploaded files, assessment free-text, and the LLM/OpenRouter are al
 | Direct object reference to documents/reports | No public paths; access via short-lived pre-signed URLs **after** authorization; storage keys opaque. |
 | **Prompt-injection-driven data exfiltration** (malicious assessment text instructs the LLM to leak) | Prompts contain only the current assessment's findings — **no secrets, no cross-tenant data** is ever in context, so there is nothing to exfiltrate. Single monitored egress. Output is data, not actions. |
 | Sensitive data in logs | Input redaction in the LLM client; PII minimized; structured logging with field allowlists. |
-| Verbose enumeration (user/org existence via timing or messages) | Uniform auth responses; constant-ish handling of "exists/doesn't." |
+| Verbose enumeration (user/org existence via timing or messages) | Generic signin errors; signup returns duplicate-account errors for usability. Stricter anti-enumeration messaging can be enabled for hostile public deployments. |
 
 ### D — Denial of Service / Denial of Wallet
 
@@ -96,8 +96,9 @@ The browser, uploaded files, assessment free-text, and the LLM/OpenRouter are al
 
 ## Residual risk & assumptions
 
-- **Trusts the auth library** to correctly implement sessions/credentials — chosen
-  precisely so we don't implement that ourselves (ADR-0007). We track its advisories.
+- **Trusts Auth.js** to correctly implement browser sessions; backend credential
+  verification is deliberately narrow and covered by tests. We track Auth.js and
+  Argon2 dependency advisories.
 - **Trusts OpenRouter** as an external processor; mitigated by the structural blast-
   radius limit (LLM can't change findings) and by sending no secrets/cross-tenant
   data. A formal data-processing assessment of the provider precedes production.

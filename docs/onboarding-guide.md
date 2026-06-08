@@ -23,6 +23,10 @@ docker compose up -d
 open http://localhost:3000
 ```
 
+The local seed account is `demo@example.com` / `ChangeMe123!`. It is a real persisted
+user with an Argon2 password hash and an org-scoped `consultant` membership in `Demo
+Organization`; no demo auth bypass exists.
+
 You do **not** need an `OPENROUTER_API_KEY` to develop most things — the LLM client
 has a deterministic mock implementation (ADR-0004) that the app and the entire test
 suite use by default. Set a real key only when working on enhancement quality.
@@ -100,6 +104,8 @@ CI gates the same checks plus two project-specific ones:
 ## Gotchas / house rules
 
 - **Never read tenant id from the request.** It comes from the session. (ADR-0006)
+- **Never add demo credential bypasses.** Auth.js sessions must come from persisted
+  users and backend membership.
 - **Never `eval()` a rule condition.** Use the safe interpreter. (threat model: tampering)
 - **Never put cross-tenant data or secrets in an LLM prompt.** (threat model: disclosure)
 - **Never return a stack trace.** The global handler sanitizes; detail goes to logs.

@@ -23,16 +23,18 @@ linked.
 
 ## 1. Authentication
 
-Managed library (Auth.js / Better Auth), not hand-rolled (ADR-0007).
+Auth.js manages browser sessions (ADR-0007). The credentials source is the backend:
+persisted users, Argon2 password hashes, email verification tokens, and
+membership-derived claims. The removed demo bypass skipped password verification; that
+path no longer exists.
 
 | Control | Design |
 |---|---|
-| Sessions | Secure, httpOnly, SameSite cookies; short-lived access + rotating refresh. |
-| Refresh-token rotation | Each refresh issues a new token and invalidates the prior; reuse of a rotated token revokes the session family (theft detection). |
-| Session invalidation | Server-side session revocation on logout, password reset, and role change. |
-| Password reset | Single-use, time-boxed, hashed reset tokens; reset invalidates existing sessions. |
-| Email verification | Required before privileged actions; verification token hashed and time-boxed. |
-| Credential storage | Owned by the auth library (strong adaptive hashing); the app stores no raw passwords. |
+| Sessions | Auth.js secure, httpOnly, SameSite cookies; BFF mints short-lived API service tokens. |
+| Session invalidation | Signout clears the Auth.js session. Server-side revocation/session-versioning is future work for password reset and role-change invalidation. |
+| Password reset | Future work: use the same hashed, single-use token pattern as email verification. |
+| Email verification | Implemented as hashed, single-use, time-boxed tokens. Local dev returns the token; production must deliver it by SMTP. |
+| Credential storage | Argon2 password hashes in `users.password_hash`; raw passwords are never stored or returned. |
 
 ---
 
@@ -42,9 +44,9 @@ Default-deny RBAC in the application (ADR-0007), composed with tenant isolation
 (ADR-0006).
 
 - Roles: `admin`, `consultant`, `org_user`. Permissions table allows finer grants.
-- **Every endpoint declares required role + tenant scope** via an injected guard. An
-  undeclared route is forbidden by default; a CI test fails the build if any
-  registered route lacks a guard.
+- **Every tenant/data endpoint declares required role + tenant scope** via an injected
+  guard. The only public v1 routes are signup, signin, and email verification; a CI
+  test fails the build if any other registered route lacks a guard.
 - Authorization (role) and isolation (tenant) are **separate, both-must-pass** checks.
 - Object-level checks: a consultant editing a finding is verified against that
   finding's assessment/org, not just their global role.
@@ -65,7 +67,12 @@ The highest-severity control. See [ADR-0006](../adr/0006-multi-tenancy-isolation
   role** (`app_role`, migration `0010`) — superusers/owners bypass RLS, so this detail
   is what makes the layer real. Verified: a query with *no* application `WHERE` filter
   returns only the caller's org, and nothing when scope is unset (fail-closed). An
-  audited `app.bypass_rls` flag permits admin cross-org aggregation.
+  audited `app.bypass_rls` flag permits the two operations that legitimately span
+  orgs: admin cross-org aggregation, and the **identity read** that loads a user's
+  *own* memberships at sign-in / `/me` (a user's identity spans their orgs and is
+  established before any single org is scoped). That read is filtered strictly to the
+  authenticated user's rows and RLS enforcement is restored immediately afterward, so
+  it cannot see another user's or tenant's data.
 - Mandatory test suite: for every tenant-owned resource, assert tenant A cannot read,
   list, mutate, or enumerate tenant B's data through any endpoint.
 
@@ -80,7 +87,7 @@ The highest-severity control. See [ADR-0006](../adr/0006-multi-tenancy-isolation
 | Rate limiting | Redis-backed, per-principal and per-IP; stricter limits on auth and LLM-triggering endpoints. |
 | Secure headers | HSTS, `X-Content-Type-Options`, `X-Frame-Options`/frame-ancestors, a strict CSP on the web app, `Referrer-Policy`. |
 | Error sanitization | Global handler returns a generic message + correlation id. **Stack traces and internals are never exposed.** Detail goes to logs only. |
-| Audit logging | Security-relevant actions → append-only `audit_logs` (actor, action, entity, ip, time). |
+| Audit logging | Signup/signin success/failure and security-relevant domain actions → append-only `audit_logs` (actor, action, entity, time). IP capture is future work. |
 | CORS | Explicit allowlist; credentials only for trusted origins. |
 | Idempotency | State-changing, cost-bearing operations (assessment completion, report/LLM jobs) are idempotency-keyed. |
 

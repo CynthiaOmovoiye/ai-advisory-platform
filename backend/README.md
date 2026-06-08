@@ -35,6 +35,7 @@ SQLAlchemy persistence, FastAPI API) adds the real stack and is fully tested off
 | `app/llm/openrouter.py` | **Real OpenRouter provider** (ADR-0004): structured output, bounded retries + exponential backoff, and token/cost/latency telemetry (`llm_calls`). Pure helpers split from httpx I/O. |
 | `app/infra/` | Settings (env-driven) + DB engine/session plumbing (JSONB on Postgres, JSON on SQLite). |
 | `app/repositories/orm.py`, `sql.py` | SQLAlchemy ORM + **SQL repositories** satisfying the same Protocols as the in-memory ones — tenant scope enforced in every query (ADR-0006). |
+| `app/services/auth_service.py` | Real credential auth: signup, Argon2 password hashing, email verification tokens, signin, and membership-derived session claims. |
 | `migrations/` | **Alembic** setup + initial migration (`0001_initial`). |
 | `app/api/` | FastAPI app: DI (`deps.py`), the default-deny guard, assessment routes, sanitized error handlers, secure headers, correlation ids. |
 | `app/schemas/` | Pydantic v2 API DTOs. |
@@ -88,21 +89,22 @@ Beyond the pure domain core above, the application is wired end to end:
   recommendations (consultant workspace), reports, documents (uploads), admin metrics,
   evaluation, with default-deny guards, sanitized errors, secure headers, CORS, rate
   limiting, request-size limits, and `/healthz` + `/readyz`.
-- **Service layer** (`app/services/`) — assessment, template, organization, recommendation,
-  evaluation, document, metrics.
+- **Service layer** (`app/services/`) — auth, assessment, template, organization,
+  recommendation, evaluation, document, metrics.
 - **SQLAlchemy repositories + Alembic migrations** (`app/repositories/`, `migrations/`) —
-  10 migrations, incl. Postgres Row-Level Security (`0009`) and a non-superuser `app_role`
-  (`0010`) so RLS is actually enforced.
+  11 migrations, incl. Postgres Row-Level Security (`0009`), a non-superuser
+  `app_role` (`0010`) so RLS is actually enforced, and persisted users/verification
+  tokens (`0011`).
 - **Real OpenRouter provider** (`app/llm/openrouter.py`) with retries + token/cost telemetry,
   plus the deterministic mock used by default offline.
 - **Celery worker** (`app/worker/tasks.py`) — async report rendering (HTML→PDF, Playwright)
   and the document malware-scan task.
 
-Verification: `pytest -q` (140 tests), `ruff check .`, `ruff format --check .`, `mypy app`,
+Verification: `pytest -q` (158 tests), `ruff check .`, `ruff format --check .`, `mypy app`,
 `alembic upgrade head` + `python scripts/check_migrations.py` — all green in CI.
 
 ## Intentional extension points (designed, not built)
 
-RAG/pgvector knowledge base, agent workflows, a human-in-the-loop review-queue table, a
-real malware scanner behind the scan interface, and a DB-backed Auth.js user store /
-external IdP (the current login is **demo-only** — see [`frontend/README.md`](../frontend/README.md#authentication)).
+RAG/pgvector knowledge base, agent workflows, a human-in-the-loop review-queue table,
+a real malware scanner behind the scan interface, SMTP-backed email delivery, and
+password reset UI/delivery.

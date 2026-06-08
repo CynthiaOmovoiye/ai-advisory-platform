@@ -13,18 +13,20 @@ Compose topology; the production path is the intended design.
 - Docker + Docker Compose
 - An `OPENROUTER_API_KEY` (for LLM enhancement; the system runs without it but reports
   fall back to deterministic narratives — see [ADR-0003](adr/0003-rule-engine-then-llm.md))
-- SMTP credentials (email verification / password reset)
+- SMTP credentials for production email verification and password reset delivery
 
 ## 2. Local
 
 ```bash
 cp .env.example .env
-# Fill in: secrets (AUTH_SECRET, FIELD_ENCRYPTION_KEY), OPENROUTER_API_KEY, SMTP_*
+# Fill in: secrets (AUTH_SECRET, FIELD_ENCRYPTION_KEY), OPENROUTER_API_KEY if used
 docker compose up -d
 ```
 
-The `api` container entrypoint runs **Alembic migrations** and then an **idempotent seed** (a demo
-organization + an assessment with responses, for the click-through demo). When healthy:
+The `api` container entrypoint runs **Alembic migrations** and then an **idempotent
+seed**: a real local account (`demo@example.com` / `ChangeMe123!`), `Demo
+Organization`, an org-scoped `consultant` membership, and an assessment with
+responses. When healthy:
 
 | Service | URL |
 |---|---|
@@ -47,6 +49,11 @@ All configuration is environment-driven (12-factor); see
 environment or a secrets manager — never committed. Key groups: database, redis,
 object storage, auth, field-encryption key, OpenRouter + cost guardrails, API
 security limits.
+
+Auth is real credential verification in all environments. Local dev can return a
+one-time email verification token from signup (`LOCAL_EMAIL_VERIFICATION_TOKENS=true`)
+so onboarding works without SMTP. Production should set that false and deliver the
+same token through email infrastructure.
 
 ## 4. Migrations & seed
 
@@ -116,6 +123,7 @@ security limits.
 
 - [ ] RLS policies enabled and tested (cross-tenant test suite green).
 - [ ] Every route has an authorization guard (CI check green).
+- [ ] `LOCAL_EMAIL_VERIFICATION_TOKENS=false`; SMTP-backed verification/reset delivery configured.
 - [ ] Rate limits, body/upload size limits, secure headers, CSP set.
 - [ ] Malware-scan integration wired (documents gate on `scan_status = clean`).
 - [ ] LLM cost guardrails + alerts configured.
