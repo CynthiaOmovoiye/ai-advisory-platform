@@ -80,9 +80,29 @@ The tests prove each leg of that: `test_enhancement.py` shows the grounded / rej
 / outage paths all yield valid recommendations; `test_eval.py` shows a hallucinating
 model is caught by the regression gate while the deterministic accuracy stays at 1.0.
 
-## Not yet built (later phases, designed in the docs)
+## What's implemented (the full application)
 
-API routers, services, repositories (SQLAlchemy), Alembic migrations, the OpenRouter
-provider implementation, Celery tasks, and the FastAPI app wiring. The
-[architecture doc](../docs/architecture/system-architecture.md) and
-[onboarding guide](../docs/onboarding-guide.md) describe where each lands.
+Beyond the pure domain core above, the application is wired end to end:
+
+- **FastAPI app + routers** (`app/api/`) — assessments, templates, organizations/members,
+  recommendations (consultant workspace), reports, documents (uploads), admin metrics,
+  evaluation, with default-deny guards, sanitized errors, secure headers, CORS, rate
+  limiting, request-size limits, and `/healthz` + `/readyz`.
+- **Service layer** (`app/services/`) — assessment, template, organization, recommendation,
+  evaluation, document, metrics.
+- **SQLAlchemy repositories + Alembic migrations** (`app/repositories/`, `migrations/`) —
+  10 migrations, incl. Postgres Row-Level Security (`0009`) and a non-superuser `app_role`
+  (`0010`) so RLS is actually enforced.
+- **Real OpenRouter provider** (`app/llm/openrouter.py`) with retries + token/cost telemetry,
+  plus the deterministic mock used by default offline.
+- **Celery worker** (`app/worker/tasks.py`) — async report rendering (HTML→PDF, Playwright)
+  and the document malware-scan task.
+
+Verification: `pytest -q` (140 tests), `ruff check .`, `ruff format --check .`, `mypy app`,
+`alembic upgrade head` + `python scripts/check_migrations.py` — all green in CI.
+
+## Intentional extension points (designed, not built)
+
+RAG/pgvector knowledge base, agent workflows, a human-in-the-loop review-queue table, a
+real malware scanner behind the scan interface, and a DB-backed Auth.js user store /
+external IdP (the current login is **demo-only** — see [`frontend/README.md`](../frontend/README.md#authentication)).

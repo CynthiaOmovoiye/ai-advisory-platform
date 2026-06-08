@@ -23,9 +23,8 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The `api` container entrypoint runs **Alembic migrations** and then **seed data**
-(roles, permissions, a published assessment template per category, a starter
-ruleset, prompt/model versions). When healthy:
+The `api` container entrypoint runs **Alembic migrations** and then an **idempotent seed** (a demo
+organization + an assessment with responses, for the click-through demo). When healthy:
 
 | Service | URL |
 |---|---|
@@ -55,8 +54,7 @@ security limits.
   destructive changes are two-phase (expand → migrate → contract).
 - **Seed:** idempotent; safe to re-run. Seeds reference data only (roles, permissions,
   templates, starter ruleset, prompt/model versions), never tenant data.
-- `db/schema.sql` is the readable canonical schema and must stay in sync with the
-  migration head (a CI check diffs them).
+- `db/schema.sql` is the readable canonical schema and must stay in sync with the ORM models (CI applies migrations on a fresh DB and asserts every ORM table exists — see scripts/check_migrations.py).
 
 ## 5. Production topology (intended)
 

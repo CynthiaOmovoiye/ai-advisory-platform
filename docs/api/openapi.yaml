@@ -1,611 +1,1216 @@
+# GENERATED from the FastAPI application — do not hand-edit.
+# Regenerate after changing routes/DTOs:
+#   cd backend && PYTHONPATH=. python -c "import yaml; from app.api.app import create_app; \
+#     yaml.safe_dump(create_app().openapi(), open('../docs/api/openapi.yaml','w'), sort_keys=False)"
+# This reflects the ACTUAL implemented API. (Liveness/readiness probes are excluded
+# from the schema by design.) CI does not yet assert this file stays in sync.
 openapi: 3.1.0
 info:
   title: AI Advisory Platform API
   version: 0.1.0
-  description: |
-    Contract-first API surface for the AI Advisory Platform.
-
-    Design notes that the contract encodes:
-      * **Default deny.** Every operation lists a security requirement; an operation
-        without one is treated as forbidden, not public.
-      * **Tenant scope is implicit.** `organization_id` is derived from the
-        authenticated principal — it is NOT a request parameter on tenant-owned
-        reads. Clients cannot select a tenant.
-      * **Errors are sanitized.** All non-2xx responses use the `Error` schema:
-        a code, a generic message, and a correlation id. No stack traces, ever.
-      * **Recommendations carry provenance.** Each one references its source rule and,
-        if enhanced, the prompt/model version and grounding result.
-    This document is the design baseline; the running API is generated from FastAPI +
-    Pydantic and validated against this contract.
-servers:
-  - url: https://api.example.com/v1
-    description: Production
-  - url: http://localhost:8000/v1
-    description: Local
-
-security:
-  - sessionCookie: []        # default for the whole API; public ops override with `security: []`
-
-tags:
-  - name: Auth
-  - name: Organizations
-  - name: Assessments
-  - name: Rules
-  - name: Recommendations
-  - name: Reports
-  - name: Evaluation
-  - name: Admin
-
 paths:
-  # ---- Auth -----------------------------------------------------------------
-  /auth/register:
-    post:
-      tags: [Auth]
-      summary: Register a new user
-      security: []          # public
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RegisterRequest' }
-      responses:
-        '201': { description: Created; verification email sent }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Validation' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
-  /auth/login:
-    post:
-      tags: [Auth]
-      summary: Authenticate and start a session
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/LoginRequest' }
-      responses:
-        '204': { description: Session established (httpOnly cookie set) }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
-  /auth/logout:
-    post:
-      tags: [Auth]
-      summary: Invalidate the current session
-      responses:
-        '204': { description: Session invalidated }
-
-  /auth/password-reset/request:
-    post:
-      tags: [Auth]
-      summary: Request a password reset email
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email]
-              properties: { email: { type: string, format: email } }
-      responses:
-        '204': { description: Always 204 (no account enumeration) }
-
-  /auth/email/verify:
-    post:
-      tags: [Auth]
-      summary: Verify email with a single-use token
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [token]
-              properties: { token: { type: string } }
-      responses:
-        '204': { description: Verified }
-        '400': { $ref: '#/components/responses/BadRequest' }
-
-  /me:
+  /v1/assessments:
     get:
-      tags: [Auth]
-      summary: Current principal (identity, roles, org memberships)
+      tags:
+      - Assessments
+      summary: List Assessments
+      operationId: list_assessments_v1_assessments_get
       responses:
         '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Principal' }
-
-  # ---- Organizations --------------------------------------------------------
-  /organizations:
-    post:
-      tags: [Organizations]
-      summary: Create an organization
-      x-rbac: [admin, consultant]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name, slug]
-              properties:
-                name: { type: string, maxLength: 200 }
-                slug: { type: string, pattern: '^[a-z0-9-]{3,40}$' }
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Organization' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  /organizations/{orgId}/members:
-    post:
-      tags: [Organizations]
-      summary: Invite a member
-      x-rbac: [admin, consultant, org_user_admin]
-      parameters: [ { $ref: '#/components/parameters/OrgId' } ]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email, role]
-              properties:
-                email: { type: string, format: email }
-                role: { type: string, enum: [org_user, consultant] }
-      responses:
-        '202': { description: Invitation sent }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  # ---- Assessments ----------------------------------------------------------
-  /assessments:
-    get:
-      tags: [Assessments]
-      summary: List assessments for the caller's organization
-      description: Tenant scope is implicit (from session). No org parameter.
-      parameters:
-        - { $ref: '#/components/parameters/Status' }
-        - { $ref: '#/components/parameters/Limit' }
-        - { $ref: '#/components/parameters/Cursor' }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/AssessmentPage' }
-    post:
-      tags: [Assessments]
-      summary: Start an assessment from a published template
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [templateId]
-              properties: { templateId: { type: string, format: uuid } }
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Assessment' }
-
-  /assessments/{id}:
-    get:
-      tags: [Assessments]
-      summary: Get an assessment (with sections/questions/responses)
-      parameters: [ { $ref: '#/components/parameters/Id' } ]
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Assessment' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-
-  /assessments/{id}/responses:
-    put:
-      tags: [Assessments]
-      summary: Upsert responses (validated per question type)
-      parameters: [ { $ref: '#/components/parameters/Id' } ]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [responses]
-              properties:
-                responses:
-                  type: array
-                  items: { $ref: '#/components/schemas/ResponseInput' }
-      responses:
-        '200': { description: Saved }
-        '422': { $ref: '#/components/responses/Validation' }
-
-  /assessments/{id}/complete:
-    post:
-      tags: [Assessments]
-      summary: Complete an assessment; runs the rule engine, enqueues LLM enhancement
-      description: |
-        Idempotent (idempotency-key). Pins the active ruleset version, evaluates
-        deterministically, persists recommendations (status=draft), then enqueues
-        enhancement + evaluation. Returns immediately; poll the assessment/recommendations.
-      parameters:
-        - { $ref: '#/components/parameters/Id' }
-        - { $ref: '#/components/parameters/IdempotencyKey' }
-      responses:
-        '202':
-          description: Accepted; processing
+          description: Successful Response
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  assessmentId: { type: string, format: uuid }
-                  status: { type: string, example: evaluating }
-        '409': { $ref: '#/components/responses/Conflict' }
-
-  # ---- Recommendations (consultant workspace) -------------------------------
-  /assessments/{id}/recommendations:
-    get:
-      tags: [Recommendations]
-      summary: List recommendations for an assessment (with provenance)
-      parameters: [ { $ref: '#/components/parameters/Id' } ]
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
+                items:
+                  $ref: '#/components/schemas/AssessmentOut'
                 type: array
-                items: { $ref: '#/components/schemas/Recommendation' }
-
-  /recommendations/{id}:
-    patch:
-      tags: [Recommendations]
-      summary: Edit / approve / reject a recommendation (consultant)
-      x-rbac: [consultant, admin]
-      parameters: [ { $ref: '#/components/parameters/Id' } ]
+                title: Response List Assessments V1 Assessments Get
+    post:
+      tags:
+      - Assessments
+      summary: Create Assessment
+      description: Start an assessment in the caller's org from a published template (Module 3).
+      operationId: create_assessment_v1_assessments_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                title: { type: string }
-                finding: { type: string }
-                rationale: { type: string }
-                remediation: { type: string }
-                status: { type: string, enum: [edited, approved, rejected] }
+              $ref: '#/components/schemas/CreateAssessmentRequest'
+        required: true
       responses:
-        '200':
-          description: Updated (audited)
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Recommendation' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  # ---- Rules (database-driven, editable without deploy) ---------------------
-  /rules:
-    get:
-      tags: [Rules]
-      summary: List rules in the active ruleset
-      x-rbac: [admin, consultant]
-      responses:
-        '200':
-          description: OK
+        '201':
+          description: Successful Response
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: '#/components/schemas/Rule' }
-    post:
-      tags: [Rules]
-      summary: Create a rule (no deployment required; audited)
-      x-rbac: [admin]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RuleInput' }
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Rule' }
+                $ref: '#/components/schemas/AssessmentOut'
         '422':
-          description: Invalid condition tree (rejected by the safe-expression validator)
-
-  # ---- Reports --------------------------------------------------------------
-  /assessments/{id}/report:
-    post:
-      tags: [Reports]
-      summary: Generate & publish a report (HTML→PDF via Playwright)
-      x-rbac: [consultant, admin]
-      description: Requires approved recommendations. Renders async; PDF stored in object storage.
-      parameters: [ { $ref: '#/components/parameters/Id' } ]
-      responses:
-        '202': { description: Accepted; rendering }
-        '409': { description: Recommendations not all approved }
-
-  /reports/{id}:
-    get:
-      tags: [Reports]
-      summary: Get a report (metadata + short-lived pre-signed PDF URL)
-      parameters: [ { $ref: '#/components/parameters/Id' } ]
-      responses:
-        '200':
-          description: OK
+          description: Validation Error
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Report' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-
-  # ---- Evaluation -----------------------------------------------------------
-  /evaluation/runs:
-    post:
-      tags: [Evaluation]
-      summary: Trigger an evaluation run (dataset × prompt version × model version)
-      x-rbac: [admin]
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/assessments/{assessment_id}:
+    get:
+      tags:
+      - Assessments
+      summary: Get Assessment
+      operationId: get_assessment_v1_assessments__assessment_id__get
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assessment Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentDetailOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/assessments/{assessment_id}/responses:
+    put:
+      tags:
+      - Assessments
+      summary: Save Responses
+      operationId: save_responses_v1_assessments__assessment_id__responses_put
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assessment Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [datasetId, promptVersionId, modelVersionId]
-              properties:
-                datasetId: { type: string, format: uuid }
-                promptVersionId: { type: string, format: uuid }
-                modelVersionId: { type: string, format: uuid }
+              $ref: '#/components/schemas/SaveResponsesRequest'
       responses:
-        '202':
-          description: Run started
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EvaluationRun' }
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/assessments/{assessment_id}/complete:
+    post:
+      tags:
+      - Assessments
+      summary: Complete Assessment
+      operationId: complete_assessment_v1_assessments__assessment_id__complete_post
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assessment Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompleteAssessmentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/assessments/{assessment_id}/recommendations:
     get:
-      tags: [Evaluation]
-      summary: List runs (for regression comparison)
-      x-rbac: [admin]
+      tags:
+      - Assessments
+      summary: List Recommendations
+      operationId: list_recommendations_v1_assessments__assessment_id__recommendations_get
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assessment Id
       responses:
         '200':
-          description: OK
+          description: Successful Response
           content:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/EvaluationRun' }
-
-  # ---- Admin ----------------------------------------------------------------
-  /admin/metrics:
-    get:
-      tags: [Admin]
-      summary: System metrics (orgs, assessments, reports, AI usage, eval, health)
-      x-rbac: [admin]
-      responses:
-        '200':
-          description: OK
+                items:
+                  $ref: '#/components/schemas/RecommendationOut'
+                title: Response List Recommendations V1 Assessments  Assessment Id  Recommendations Get
+        '422':
+          description: Validation Error
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AdminMetrics' }
-
-components:
-  securitySchemes:
-    sessionCookie:
-      type: apiKey
-      in: cookie
-      name: session
-      description: httpOnly, Secure, SameSite session cookie issued by the auth library.
-
-  parameters:
-    Id:        { name: id,    in: path,  required: true, schema: { type: string, format: uuid } }
-    OrgId:     { name: orgId, in: path,  required: true, schema: { type: string, format: uuid } }
-    Status:    { name: status, in: query, required: false, schema: { type: string } }
-    Limit:     { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
-    Cursor:    { name: cursor, in: query, required: false, schema: { type: string } }
-    IdempotencyKey:
-      name: Idempotency-Key
-      in: header
-      required: false
-      schema: { type: string }
-
-  responses:
-    BadRequest:   { description: Bad request,   content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    Unauthorized: { description: Unauthorized,   content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    Forbidden:    { description: Forbidden,      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    NotFound:     { description: Not found,      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    Conflict:     { description: Conflict,       content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    Validation:   { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    RateLimited:  { description: Too many requests, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-
-  schemas:
-    Error:
-      type: object
-      description: Sanitized error. Never contains stack traces or internal detail.
-      required: [code, message, correlationId]
-      properties:
-        code: { type: string, example: forbidden }
-        message: { type: string, example: You do not have access to this resource. }
-        correlationId: { type: string, example: 7f3c1e2a-... }
-
-    RegisterRequest:
-      type: object
-      required: [email, password, displayName]
-      properties:
-        email: { type: string, format: email }
-        password: { type: string, minLength: 12, writeOnly: true }
-        displayName: { type: string, maxLength: 120 }
-
-    LoginRequest:
-      type: object
-      required: [email, password]
-      properties:
-        email: { type: string, format: email }
-        password: { type: string, writeOnly: true }
-
-    Principal:
-      type: object
-      properties:
-        userId: { type: string, format: uuid }
-        email: { type: string, format: email }
-        roles: { type: array, items: { type: string, enum: [admin, consultant, org_user] } }
-        organizations:
-          type: array
-          items:
-            type: object
-            properties:
-              id: { type: string, format: uuid }
-              name: { type: string }
-              role: { type: string }
-
-    Organization:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        slug: { type: string }
-        createdAt: { type: string, format: date-time }
-
-    Assessment:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        templateId: { type: string, format: uuid }
-        category:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/organizations:
+    post:
+      tags:
+      - Organizations
+      summary: Create Organization
+      operationId: create_organization_v1_organizations_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/members:
+    get:
+      tags:
+      - Organizations
+      summary: List Members
+      operationId: list_members_v1_members_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/MemberOut'
+                type: array
+                title: Response List Members V1 Members Get
+    post:
+      tags:
+      - Organizations
+      summary: Invite Member
+      operationId: invite_member_v1_members_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteMemberRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteMemberResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/members/{member_id}:
+    delete:
+      tags:
+      - Organizations
+      summary: Remove Member
+      operationId: remove_member_v1_members__member_id__delete
+      parameters:
+      - name: member_id
+        in: path
+        required: true
+        schema:
           type: string
-          enum: [ai_readiness, data_maturity, security, governance, compliance, operations, infrastructure]
+          title: Member Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/recommendations/{recommendation_id}:
+    patch:
+      tags:
+      - Recommendations
+      summary: Patch Recommendation
+      operationId: patch_recommendation_v1_recommendations__recommendation_id__patch
+      parameters:
+      - name: recommendation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Recommendation Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendationPatch'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/assessments/{assessment_id}/report:
+    post:
+      tags:
+      - Reports
+      summary: Request Report
+      operationId: request_report_v1_assessments__assessment_id__report_post
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assessment Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - Reports
+      summary: Get Report
+      operationId: get_report_v1_assessments__assessment_id__report_get
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assessment Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/admin/metrics:
+    get:
+      tags:
+      - Admin
+      summary: Admin Metrics
+      operationId: admin_metrics_v1_admin_metrics_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMetricsOut'
+  /v1/evaluation/runs:
+    get:
+      tags:
+      - Evaluation
+      summary: List Runs
+      operationId: list_runs_v1_evaluation_runs_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/EvaluationRunOut'
+                type: array
+                title: Response List Runs V1 Evaluation Runs Get
+    post:
+      tags:
+      - Evaluation
+      summary: Trigger Run
+      operationId: trigger_run_v1_evaluation_runs_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriggerEvaluationRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationRunOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/templates:
+    get:
+      tags:
+      - Templates
+      summary: List Templates
+      operationId: list_templates_v1_templates_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/TemplateOut'
+                type: array
+                title: Response List Templates V1 Templates Get
+    post:
+      tags:
+      - Templates
+      summary: Create Template
+      operationId: create_template_v1_templates_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/templates/{template_id}:
+    get:
+      tags:
+      - Templates
+      summary: Get Template
+      operationId: get_template_v1_templates__template_id__get
+      parameters:
+      - name: template_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Template Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/templates/{template_id}/publish:
+    post:
+      tags:
+      - Templates
+      summary: Publish Template
+      operationId: publish_template_v1_templates__template_id__publish_post
+      parameters:
+      - name: template_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Template Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/assessments/{assessment_id}/documents:
+    post:
+      tags:
+      - Documents
+      summary: Upload Document
+      operationId: upload_document_v1_assessments__assessment_id__documents_post
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assessment Id
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_document_v1_assessments__assessment_id__documents_post'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - Documents
+      summary: List Documents
+      operationId: list_documents_v1_assessments__assessment_id__documents_get
+      parameters:
+      - name: assessment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assessment Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentOut'
+                title: Response List Documents V1 Assessments  Assessment Id  Documents Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/documents/{document_id}/download:
+    get:
+      tags:
+      - Documents
+      summary: Download Document
+      operationId: download_document_v1_documents__document_id__download_get
+      parameters:
+      - name: document_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Document Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    AdminMetricsOut:
+      properties:
+        organizations:
+          type: integer
+          title: Organizations
+        assessments_total:
+          type: integer
+          title: Assessments Total
+        assessments_by_status:
+          additionalProperties:
+            type: integer
+          type: object
+          title: Assessments By Status
+        reports_published:
+          type: integer
+          title: Reports Published
+        ai_usage:
+          additionalProperties: true
+          type: object
+          title: Ai Usage
+        evaluation:
+          additionalProperties: true
+          type: object
+          title: Evaluation
+      type: object
+      required:
+      - organizations
+      - assessments_total
+      - assessments_by_status
+      - reports_published
+      - ai_usage
+      - evaluation
+      title: AdminMetricsOut
+    AssessmentDetailOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        template_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template Id
+        template_name:
+          type: string
+          title: Template Name
         status:
           type: string
-          enum: [in_progress, completed, evaluating, reviewed, archived]
-        completedAt: { type: string, format: date-time, nullable: true }
-
-    AssessmentPage:
+          title: Status
+        sections:
+          items:
+            $ref: '#/components/schemas/SectionOut'
+          type: array
+          title: Sections
+        responses:
+          additionalProperties: true
+          type: object
+          title: Responses
       type: object
+      required:
+      - id
+      - template_id
+      - template_name
+      - status
+      - sections
+      - responses
+      title: AssessmentDetailOut
+      description: "An assessment plus its template's questions and any saved responses \u2014 everything\n\
+        the answering UI needs to render and resume the form."
+    AssessmentOut:
       properties:
-        items: { type: array, items: { $ref: '#/components/schemas/Assessment' } }
-        nextCursor: { type: string, nullable: true }
-
-    ResponseInput:
+        id:
+          type: string
+          title: Id
+        template_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template Id
+        template_name:
+          type: string
+          title: Template Name
+        status:
+          type: string
+          title: Status
       type: object
-      required: [questionId, value]
+      required:
+      - id
+      - template_id
+      - template_name
+      - status
+      title: AssessmentOut
+    Body_upload_document_v1_assessments__assessment_id__documents_post:
       properties:
-        questionId: { type: string, format: uuid }
-        value:
-          description: Shape validated server-side against the question type.
-          oneOf:
-            - { type: string }
-            - { type: number }
-            - { type: array, items: { type: string } }
-            - { type: object }
-
-    Recommendation:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
       type: object
-      description: Deterministic finding + optional LLM narrative + provenance.
+      required:
+      - file
+      title: Body_upload_document_v1_assessments__assessment_id__documents_post
+    CompleteAssessmentResponse:
       properties:
-        id: { type: string, format: uuid }
-        ruleId: { type: string, format: uuid, nullable: true, description: Source rule (traceability) }
-        category: { type: string }
-        severity: { type: string, enum: [info, low, medium, high, critical] }
-        title: { type: string }
-        finding: { type: string, description: Deterministic (source of truth) }
-        rationale: { type: string, nullable: true, description: LLM-enhanced }
-        remediation: { type: string, nullable: true, description: LLM-enhanced }
-        status: { type: string, enum: [draft, edited, approved, rejected] }
+        assessment_id:
+          type: string
+          title: Assessment Id
+        status:
+          type: string
+          title: Status
+        recommendations:
+          items:
+            $ref: '#/components/schemas/RecommendationOut'
+          type: array
+          title: Recommendations
+      type: object
+      required:
+      - assessment_id
+      - status
+      - recommendations
+      title: CompleteAssessmentResponse
+    CreateAssessmentRequest:
+      properties:
+        template_id:
+          type: string
+          title: Template Id
+      type: object
+      required:
+      - template_id
+      title: CreateAssessmentRequest
+    CreateOrganizationRequest:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        slug:
+          type: string
+          pattern: ^[a-z0-9-]{3,40}$
+          title: Slug
+      type: object
+      required:
+      - name
+      - slug
+      title: CreateOrganizationRequest
+    CreateTemplateRequest:
+      properties:
+        category:
+          type: string
+          enum:
+          - ai_readiness
+          - data_maturity
+          - security
+          - governance
+          - compliance
+          - operations
+          - infrastructure
+          title: Category
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        sections:
+          items:
+            $ref: '#/components/schemas/SectionIn'
+          type: array
+          title: Sections
+      type: object
+      required:
+      - category
+      - title
+      title: CreateTemplateRequest
+    DocumentOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        original_filename:
+          type: string
+          title: Original Filename
+        mime_type:
+          type: string
+          title: Mime Type
+        byte_size:
+          type: integer
+          title: Byte Size
+        scan_status:
+          type: string
+          title: Scan Status
+      type: object
+      required:
+      - id
+      - original_filename
+      - mime_type
+      - byte_size
+      - scan_status
+      title: DocumentOut
+    DownloadResponse:
+      properties:
+        url:
+          type: string
+          title: Url
+      type: object
+      required:
+      - url
+      title: DownloadResponse
+    EvaluationRunOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        dataset_name:
+          type: string
+          title: Dataset Name
+        ruleset_name:
+          type: string
+          title: Ruleset Name
+        model_id:
+          type: string
+          title: Model Id
+        status:
+          type: string
+          title: Status
+        accuracy:
+          type: number
+          title: Accuracy
+        consistency:
+          type: number
+          title: Consistency
+        completeness:
+          type: number
+          title: Completeness
+        hallucination_rate:
+          type: number
+          title: Hallucination Rate
+        item_count:
+          type: integer
+          title: Item Count
+      type: object
+      required:
+      - id
+      - dataset_name
+      - ruleset_name
+      - model_id
+      - status
+      - accuracy
+      - consistency
+      - completeness
+      - hallucination_rate
+      - item_count
+      title: EvaluationRunOut
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    InviteMemberRequest:
+      properties:
+        email:
+          type: string
+          maxLength: 254
+          minLength: 3
+          pattern: ^[^@\s]+@[^@\s]+\.[^@\s]+$
+          title: Email
+        role:
+          type: string
+          enum:
+          - org_user
+          - consultant
+          title: Role
+          default: org_user
+      type: object
+      required:
+      - email
+      title: InviteMemberRequest
+    InviteMemberResponse:
+      properties:
+        member:
+          $ref: '#/components/schemas/MemberOut'
+        invite_token:
+          type: string
+          title: Invite Token
+      type: object
+      required:
+      - member
+      - invite_token
+      title: InviteMemberResponse
+    MemberOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        invited_email:
+          type: string
+          title: Invited Email
+        role:
+          type: string
+          title: Role
+        status:
+          type: string
+          title: Status
+      type: object
+      required:
+      - id
+      - invited_email
+      - role
+      - status
+      title: MemberOut
+    OrganizationOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        name:
+          type: string
+          title: Name
+        slug:
+          type: string
+          title: Slug
+      type: object
+      required:
+      - id
+      - name
+      - slug
+      title: OrganizationOut
+    Provenance:
+      properties:
+        source:
+          type: string
+          enum:
+          - llm
+          - fallback
+          title: Source
+        grounding_passed:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Grounding Passed
+      type: object
+      required:
+      - source
+      - grounding_passed
+      title: Provenance
+    QuestionIn:
+      properties:
+        key:
+          type: string
+          pattern: ^[a-z0-9_]{1,60}$
+          title: Key
+        prompt:
+          type: string
+          minLength: 1
+          title: Prompt
+        type:
+          type: string
+          enum:
+          - text
+          - long_text
+          - number
+          - single_select
+          - multi_select
+          - file_upload
+          title: Type
+        config:
+          additionalProperties: true
+          type: object
+          title: Config
+      type: object
+      required:
+      - key
+      - prompt
+      - type
+      title: QuestionIn
+    QuestionOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        key:
+          type: string
+          title: Key
+        prompt:
+          type: string
+          title: Prompt
+        type:
+          type: string
+          title: Type
+        config:
+          additionalProperties: true
+          type: object
+          title: Config
+      type: object
+      required:
+      - id
+      - key
+      - prompt
+      - type
+      - config
+      title: QuestionOut
+    RecommendationOut:
+      properties:
+        id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Id
+        rule_code:
+          type: string
+          title: Rule Code
+        category:
+          type: string
+          title: Category
+        severity:
+          type: string
+          title: Severity
+        title:
+          type: string
+          title: Title
+        finding:
+          type: string
+          title: Finding
+        rationale:
+          type: string
+          title: Rationale
+        remediation:
+          type: string
+          title: Remediation
+        status:
+          type: string
+          title: Status
         provenance:
-          type: object
-          properties:
-            promptVersionId: { type: string, format: uuid, nullable: true }
-            modelVersionId: { type: string, format: uuid, nullable: true }
-            groundingPassed: { type: boolean, nullable: true }
-
-    Rule:
-      allOf:
-        - $ref: '#/components/schemas/RuleInput'
-        - type: object
-          properties:
-            id: { type: string, format: uuid }
-            rulesetId: { type: string, format: uuid }
-
-    RuleInput:
+          $ref: '#/components/schemas/Provenance'
       type: object
-      required: [code, category, severity, condition, recommendationTemplate]
+      required:
+      - id
+      - rule_code
+      - category
+      - severity
+      - title
+      - finding
+      - rationale
+      - remediation
+      - status
+      - provenance
+      title: RecommendationOut
+    RecommendationPatch:
       properties:
-        code: { type: string, example: SEC-MFA-001 }
-        category: { type: string }
-        severity: { type: string, enum: [info, low, medium, high, critical] }
-        condition:
-          type: object
-          description: Safe boolean expression tree (no executable code). Validated on write.
-          example:
-            op: and
-            args:
-              - { op: eq, key: mfa_enabled, value: false }
-              - { op: eq, key: sensitive_data_present, value: true }
-        recommendationTemplate:
-          type: object
-          properties:
-            title: { type: string, example: Enforce multi-factor authentication }
-            body: { type: string }
-            references: { type: array, items: { type: string } }
-        priority: { type: integer, default: 100 }
-        isActive: { type: boolean, default: true }
-
-    Report:
+        title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Title
+        finding:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Finding
+        rationale:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Rationale
+        remediation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Remediation
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - approved
+            - rejected
+          - type: 'null'
+          title: Status
       type: object
-      properties:
-        id: { type: string, format: uuid }
-        title: { type: string }
-        status: { type: string, enum: [draft, published] }
-        pdfUrl: { type: string, nullable: true, description: Short-lived pre-signed URL }
-        publishedAt: { type: string, format: date-time, nullable: true }
+      title: RecommendationPatch
+      description: 'Consultant edit + review action. Narrative fields are editable; status moves the
 
-    EvaluationRun:
-      type: object
+        review forward. Deterministic provenance (rule, severity, source) is NOT editable.'
+    ReportOut:
       properties:
-        id: { type: string, format: uuid }
-        datasetId: { type: string, format: uuid }
-        promptVersionId: { type: string, format: uuid }
-        modelVersionId: { type: string, format: uuid }
-        status: { type: string, enum: [running, completed, failed] }
-        accuracy: { type: number, nullable: true }
-        consistency: { type: number, nullable: true }
-        completeness: { type: number, nullable: true }
-        hallucinationRate: { type: number, nullable: true }
-
-    AdminMetrics:
+        id:
+          type: string
+          title: Id
+        assessment_id:
+          type: string
+          title: Assessment Id
+        title:
+          type: string
+          title: Title
+        status:
+          type: string
+          title: Status
+        pdf_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pdf Url
       type: object
+      required:
+      - id
+      - assessment_id
+      - title
+      - status
+      - pdf_url
+      title: ReportOut
+    ResponseInput:
       properties:
-        organizations: { type: integer }
-        assessments: { type: integer }
-        reports: { type: integer }
-        aiUsage:
+        key:
+          type: string
+          title: Key
+        value:
+          title: Value
+      type: object
+      required:
+      - key
+      - value
+      title: ResponseInput
+    SaveResponsesRequest:
+      properties:
+        responses:
+          items:
+            $ref: '#/components/schemas/ResponseInput'
+          type: array
+          title: Responses
+      type: object
+      required:
+      - responses
+      title: SaveResponsesRequest
+    SectionIn:
+      properties:
+        title:
+          type: string
+          minLength: 1
+          title: Title
+        questions:
+          items:
+            $ref: '#/components/schemas/QuestionIn'
+          type: array
+          title: Questions
+      type: object
+      required:
+      - title
+      title: SectionIn
+    SectionOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        title:
+          type: string
+          title: Title
+        questions:
+          items:
+            $ref: '#/components/schemas/QuestionOut'
+          type: array
+          title: Questions
+      type: object
+      required:
+      - id
+      - title
+      - questions
+      title: SectionOut
+    TemplateOut:
+      properties:
+        id:
+          type: string
+          title: Id
+        category:
+          type: string
+          title: Category
+        title:
+          type: string
+          title: Title
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        version:
+          type: integer
+          title: Version
+        status:
+          type: string
+          title: Status
+        sections:
+          items:
+            $ref: '#/components/schemas/SectionOut'
+          type: array
+          title: Sections
+      type: object
+      required:
+      - id
+      - category
+      - title
+      - description
+      - version
+      - status
+      - sections
+      title: TemplateOut
+    TriggerEvaluationRequest:
+      properties:
+        dataset_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Dataset Name
+          default: baseline-readiness
+      type: object
+      title: TriggerEvaluationRequest
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
           type: object
-          properties:
-            calls: { type: integer }
-            inputTokens: { type: integer }
-            outputTokens: { type: integer }
-            estimatedCost: { type: number }
-        evaluation:
-          type: object
-          properties:
-            latestAccuracy: { type: number }
-            latestHallucinationRate: { type: number }
-        systemHealth:
-          type: object
-          properties:
-            apiLatencyP95Ms: { type: number }
-            llmLatencyP95Ms: { type: number }
-            queueDepth: { type: integer }
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError

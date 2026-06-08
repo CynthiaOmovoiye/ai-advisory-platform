@@ -20,27 +20,32 @@ declare module "next-auth" {
   }
 }
 
+// DEMO-ONLY login. It accepts any email/password and grants a global-admin session so
+// the whole UI is exercisable end-to-end. It is enabled ONLY when AUTH_DEMO_MODE !==
+// "false" (i.e. NOT in production). In production this provider is absent and login
+// requires wiring a real IdP / credential-verification path — see frontend/README.md
+// (Authentication) and ADR-0009 for the backend trust boundary.
+const demoMode = process.env.AUTH_DEMO_MODE !== "false";
+
+const demoProvider = Credentials({
+  credentials: { email: {}, password: {} },
+  async authorize(creds) {
+    if (!creds?.email) return null;
+    return {
+      id: "demo-user",
+      email: String(creds.email),
+      name: "Demo User",
+      org: "demo-org",
+      globalRoles: ["admin"],
+    } as unknown as { id: string };
+  },
+});
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
-  providers: [
-    Credentials({
-      // Demo provider. Replace with a real IdP; the contract below is what matters.
-      credentials: { email: {}, password: {} },
-      async authorize(creds) {
-        if (!creds?.email) return null;
-        // A real provider verifies the password and loads roles/org from the backend.
-        // The demo user is a global admin so the full UI (review, publish, admin/eval
-        // dashboards) is exercisable end-to-end; swap for least-privilege in production.
-        return {
-          id: "demo-user",
-          email: String(creds.email),
-          name: "Demo User",
-          org: "demo-org",
-          globalRoles: ["admin"],
-        } as unknown as { id: string };
-      },
-    }),
-  ],
+  // In production (AUTH_DEMO_MODE=false) there is NO provider here until a real IdP is
+  // configured — login fails closed rather than granting admin to anyone.
+  providers: demoMode ? [demoProvider] : [],
   callbacks: {
     async jwt({ token, user }) {
       if (user) {

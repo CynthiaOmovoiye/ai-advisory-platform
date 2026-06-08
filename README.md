@@ -7,10 +7,11 @@
 > **deterministic rule engine** with **LLM-assisted reasoning**, wrapped in
 > production-grade evaluation, observability, security, and governance.
 
-This repository is a **design-first portfolio project**. It is intentionally built
-the way a real system would be: design and decisions before code. The current
-contents are the **architecture & design package** — the artifacts a Staff Engineer
-produces and reviews *before* a line of application code is merged.
+This repository is a **design-first portfolio project that is now fully implemented**.
+It was built the way a real system is: design and decisions first (the `docs/` package),
+then a working full-stack application against that design. Both halves ship together —
+the ADRs/threat-model explain *why*, and the code (140 backend tests, CI green, a
+runnable `docker compose` stack) is the *what*.
 
 If you only read three files, read these:
 
@@ -129,10 +130,10 @@ ai-advisory-platform/
 
 ---
 
-## Status & roadmap
+## Status
 
-This is **Phase 1–3 + design slices of 4–12** delivered as documentation, **plus
-runnable vertical slices** under `backend/`:
+All ten modules are **implemented and runnable** (`docker compose up --build` → a
+click-through demo). What's built:
 
 - **Rule-engine domain core** — safe condition evaluator, grounding check, LLM provider
   interface, evaluation framework (Phase 6).
@@ -150,7 +151,7 @@ runnable vertical slices** under `backend/`:
   gate** before a report can publish, **admin + evaluation dashboards** (real metrics
   aggregation + persisted eval runs), and the **report endpoint** wired into the API.
 
-The domain core runs with **zero dependencies**; the full backend has **103 passing
+The domain core runs with **zero dependencies**; the full backend has **140 passing
 tests**, all offline (httpx `MockTransport`, SQLite, FastAPI `TestClient`, fake PDF
 renderer). The whole assessment→review→publish lifecycle is exercised through HTTP:
 
@@ -160,7 +161,7 @@ cd backend
 PYTHONPATH=. python3 scripts/demo.py     # rule engine → grounded enhancement → eval gate
 # full suite:
 python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
-pytest -q                                # 103 passed
+pytest -q                                # 140 passed
 ```
 
 The frontend ([`frontend/`](frontend/README.md)) is a Next.js App Router app; its

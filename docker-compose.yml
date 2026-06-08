@@ -97,6 +97,7 @@ services:
       API_BASE_URL: http://api:8000/v1
       AUTH_SECRET: ${AUTH_SECRET:-change-me-32-bytes-min-shared-secret}
       AUTH_URL: http://localhost:3000
+      AUTH_DEMO_MODE: "true"  # demo login; set "false" in production
     depends_on:
       api: { condition: service_healthy }
     # Override the host port if 3000 is taken: WEB_PORT=3001 docker compose up

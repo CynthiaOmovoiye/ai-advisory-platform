@@ -79,7 +79,7 @@ CI gates the same checks plus two project-specific ones:
 
 - **Every route is guarded** (default-deny RBAC; ADR-0007) — an unguarded route fails.
 - **Cross-tenant isolation suite** (ADR-0006) — tenant A must never see tenant B.
-- **`db/schema.sql` matches the Alembic head.**
+- **Migrations apply on a fresh DB and every ORM table is present** (CI: `alembic upgrade head` + `scripts/check_migrations.py`).
 - **Evaluation regression** (against the mock provider) — accuracy can't drop /
   hallucination rate can't rise past thresholds (ADR-0005).
 

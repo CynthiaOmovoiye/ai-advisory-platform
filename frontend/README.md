@@ -57,3 +57,25 @@ npm run typecheck               # tsc --noEmit
 > The framework-agnostic core (`lib/schemas.ts`, `lib/session-token.ts`, `lib/api.ts`)
 > is typechecked in isolation and passes; the full app typechecks/builds after
 > `npm install` brings in the Next/React toolchain.
+
+## Authentication
+
+**The login is demo-only.** The Auth.js Credentials provider accepts any
+email/password and issues a **global-admin** session so the entire UI is exercisable
+end-to-end. It is enabled only when `AUTH_DEMO_MODE !== "false"` — i.e. **not in
+production**. With `AUTH_DEMO_MODE=false`, no provider is registered and login fails
+closed until a real one is wired.
+
+What **is** production-shaped (and implemented):
+
+- The **BFF trust boundary** ([ADR-0009](../docs/adr/0009-auth-bff-session-token.md)):
+  the Next.js server mints a short-lived HS256 service token from the session and the
+  FastAPI backend verifies it (signature, issuer, audience, expiry) and maps claims to
+  a `Principal`. The browser never holds a backend token.
+- **Default-deny RBAC** and **tenant isolation** on every backend route.
+
+**Extension point (not built):** a real identity source — a DB-backed Auth.js user
+store with password hashing, or an external IdP (OIDC/SAML) — plugged in as the
+provider in `lib/auth.ts`. Registration, password reset, and email verification are
+part of that work and are intentionally out of scope here. No part of the docs claims
+production auth is implemented.
