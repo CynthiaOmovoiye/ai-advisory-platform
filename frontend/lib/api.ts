@@ -112,6 +112,18 @@ export async function publishReport(
   return ReportOut.parse(data);
 }
 
+export async function getReport(
+  identity: SessionIdentity,
+  assessmentId: string,
+): Promise<ReportOut | null> {
+  try {
+    return ReportOut.parse(await request(identity, `/assessments/${assessmentId}/report`));
+  } catch (e) {
+    if (e instanceof ApiRequestError && e.status === 404) return null;
+    throw e;
+  }
+}
+
 export async function getAdminMetrics(identity: SessionIdentity): Promise<AdminMetrics> {
   return AdminMetrics.parse(await request(identity, `/admin/metrics`));
 }

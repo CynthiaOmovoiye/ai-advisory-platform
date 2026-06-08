@@ -37,26 +37,48 @@ class ReportService:
     storage: ObjectStorage
     renderer: ReportRenderer
 
-    def generate(
-        self, scope: TenantScope, assessment_id: str, *, organization_name: str
-    ) -> ReportRecord:
+    def validate_publishable(self, scope: TenantScope, assessment_id: str) -> None:
+        """Raise NotFound/Conflict if the assessment can't be reported yet. Called at
+        enqueue time so the caller gets an immediate error, and again inside the worker
+        as defense before rendering."""
         assessment = self.assessments.get(assessment_id, scope)
         if assessment is None:
             raise NotFound("assessment not found")  # cross-tenant ids resolve here too
         if assessment.status != "completed":
             raise Conflict("assessment must be completed before reporting")
-
         recs = self.recommendations.list_for_assessment(assessment_id, scope)
-
         # Approval gate (Module 9): a report cannot be published while any recommendation
-        # is still awaiting consultant review. Rejected ones are excluded; only approved
-        # findings appear in the published report.
+        # is still awaiting consultant review.
         pending = [r for r in recs if r.status in ("draft", "edited")]
         if pending:
             raise Conflict(
                 f"{len(pending)} recommendation(s) still awaiting review; "
                 "approve or reject before publishing"
             )
+
+    def queue(
+        self, scope: TenantScope, assessment_id: str, *, organization_name: str
+    ) -> ReportRecord:
+        """Validate, then persist a 'queued' report row. The actual render happens in the
+        worker (see app/worker/tasks.py); this returns immediately so the API stays fast."""
+        self.validate_publishable(scope, assessment_id)
+        report = ReportRecord(
+            id=f"report:{assessment_id}",
+            organization_id=scope.organization_id,
+            assessment_id=assessment_id,
+            title=f"AI Readiness Report — {organization_name}",
+            status="queued",
+            pdf_storage_key=None,
+        )
+        self.reports.save(report, scope)
+        return report
+
+    def generate(
+        self, scope: TenantScope, assessment_id: str, *, organization_name: str
+    ) -> ReportRecord:
+        self.validate_publishable(scope, assessment_id)
+        assessment = self.assessments.get(assessment_id, scope)
+        recs = self.recommendations.list_for_assessment(assessment_id, scope)
         approved = [r for r in recs if r.status == "approved"]
 
         model = build_report_model(

@@ -15,6 +15,7 @@ from app.api.app import create_app
 from app.api.deps import (
     get_caller,
     get_db,
+    get_report_enqueuer,
     get_report_service,
     get_storage,
 )
@@ -65,6 +66,8 @@ class TestWorkspaceApi(unittest.TestCase):
         self.app.dependency_overrides[get_db] = self._override_db
         self.app.dependency_overrides[get_storage] = lambda: self.storage
         self.app.dependency_overrides[get_report_service] = self._override_report_service
+        # Simulate the Celery worker synchronously: the enqueuer renders immediately.
+        self.app.dependency_overrides[get_report_enqueuer] = lambda: self._sync_enqueue
         self.client = TestClient(self.app, raise_server_exceptions=False)
 
     def tearDown(self):
@@ -77,16 +80,34 @@ class TestWorkspaceApi(unittest.TestCase):
         finally:
             s.close()
 
+    def _report_service(self, session):
+        return ReportService(
+            assessments=SqlAssessmentRepository(session),
+            recommendations=SqlRecommendationRepository(session),
+            reports=SqlReportRepository(session),
+            audit=SqlAuditSink(session),
+            storage=self.storage,
+            renderer=FakeRenderer(),
+        )
+
     def _override_report_service(self):
         s = self.SessionFactory()
         try:
-            yield ReportService(
-                assessments=SqlAssessmentRepository(s),
-                recommendations=SqlRecommendationRepository(s),
-                reports=SqlReportRepository(s),
-                audit=SqlAuditSink(s),
-                storage=self.storage,
-                renderer=FakeRenderer(),
+            yield self._report_service(s)
+            s.commit()
+        finally:
+            s.close()
+
+    def _sync_enqueue(self, *, assessment_id, organization_id, organization_name, actor_user_id):
+        # Stand-in for the worker: render synchronously in a fresh session.
+        from app.repositories.base import TenantScope
+
+        s = self.SessionFactory()
+        try:
+            self._report_service(s).generate(
+                TenantScope(organization_id, actor_user_id),
+                assessment_id,
+                organization_name=organization_name,
             )
             s.commit()
         finally:
@@ -153,13 +174,14 @@ class TestWorkspaceApi(unittest.TestCase):
                 200,
             )
 
-        # 4) now publishing succeeds
+        # 4) now publishing is accepted (202) and queued; the (simulated) worker renders
         published = self.client.post("/v1/assessments/assess-a/report")
-        self.assertEqual(published.status_code, 201)
-        self.assertEqual(published.json()["status"], "published")
+        self.assertEqual(published.status_code, 202)
+        self.assertEqual(published.json()["status"], "queued")
 
-        # 5) report is fetchable with a (stand-in) pre-signed URL
+        # 5) after the worker runs, the report is published and fetchable
         got = self.client.get("/v1/assessments/assess-a/report")
+        self.assertEqual(got.json()["status"], "published")
         self.assertEqual(got.status_code, 200)
         self.assertIn("reports/org-a/assess-a.pdf", got.json()["pdf_url"])
 

@@ -3,20 +3,25 @@
 import { use } from "react";
 
 import { SeverityBadge } from "@/components/SeverityBadge";
+import { useQueryClient } from "@tanstack/react-query";
+
 import {
   useCompleteAssessment,
   usePatchRecommendation,
   usePublishReport,
   useRecommendations,
+  useReport,
 } from "@/lib/queries";
 import type { Recommendation } from "@/lib/schemas";
 
 export default function AssessmentDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const qc = useQueryClient();
   const recommendations = useRecommendations(id);
   const complete = useCompleteAssessment(id);
   const patch = usePatchRecommendation(id);
   const publish = usePublishReport(id);
+  const report = useReport(id, true); // polls queued -> published
 
   const recs = recommendations.data ?? [];
   const allReviewed = recs.length > 0 && recs.every((r) => r.status === "approved" || r.status === "rejected");
@@ -34,18 +39,30 @@ export default function AssessmentDetail({ params }: { params: Promise<{ id: str
             {complete.isPending ? "Evaluating…" : "Complete & generate findings"}
           </button>
           <button
-            onClick={() => publish.mutate()}
+            onClick={() =>
+              publish.mutate(undefined, {
+                onSuccess: () => qc.invalidateQueries({ queryKey: ["report", id] }),
+              })
+            }
             disabled={!allReviewed || publish.isPending}
             title={allReviewed ? "" : "Approve or reject every recommendation first"}
             className="rounded-md border border-slate-900 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100 disabled:opacity-40"
           >
-            {publish.isPending ? "Publishing…" : "Publish report"}
+            {publish.isPending ? "Requesting…" : "Publish report"}
           </button>
         </div>
       </div>
 
-      {publish.isSuccess && publish.data.pdf_url && (
-        <a href={publish.data.pdf_url} className="block rounded-md bg-green-50 p-3 text-sm text-green-800">
+      {report.data?.status === "queued" && (
+        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+          Report rendering in the background…
+        </p>
+      )}
+      {report.data?.status === "published" && report.data.pdf_url && (
+        <a
+          href={report.data.pdf_url}
+          className="block rounded-md bg-green-50 p-3 text-sm text-green-800"
+        >
           Report published — view PDF
         </a>
       )}

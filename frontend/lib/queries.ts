@@ -134,3 +134,17 @@ export function useRemoveMember() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["members"] }),
   });
 }
+
+
+export function useReport(assessmentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["report", assessmentId],
+    enabled,
+    // Poll while the worker is still rendering (queued); stop once published.
+    refetchInterval: (q) => (q.state.data && (q.state.data as any).status === "published" ? false : 2000),
+    queryFn: async () => {
+      const data = await getJson(`/api/assessments/${assessmentId}/report`);
+      return data ? ReportOut.parse(data) : null;
+    },
+  });
+}

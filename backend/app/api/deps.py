@@ -213,6 +213,25 @@ def get_metrics_repository(db: Session = Depends(get_db)) -> SqlMetricsRepositor
     return SqlMetricsRepository(db)
 
 
+def get_report_enqueuer() -> Callable[..., None]:
+    """Return a callable that enqueues the report-render task onto Celery. Abstracted so
+    tests can override it without a running broker."""
+
+    def enqueue(
+        *, assessment_id: str, organization_id: str, organization_name: str, actor_user_id: str
+    ) -> None:
+        from app.worker.tasks import generate_report
+
+        generate_report.delay(
+            assessment_id=assessment_id,
+            organization_id=organization_id,
+            organization_name=organization_name,
+            actor_user_id=actor_user_id,
+        )
+
+    return enqueue
+
+
 def get_organization_service(db: Session = Depends(get_db)) -> OrganizationService:
     return OrganizationService(
         organizations=SqlOrganizationRepository(db),
