@@ -48,6 +48,10 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
     status: Mapped[str] = mapped_column(String, nullable=False, default="active")
+    # Bumped to invalidate every outstanding session for this user (e.g. on password
+    # reset). The BFF carries this value as a session claim; the API rejects a token
+    # whose version is behind the user's current one. See app/infra/auth.py.
+    session_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
@@ -56,6 +60,18 @@ class User(Base):
 
 class EmailVerificationToken(Base):
     __tablename__ = "email_verification_tokens"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False

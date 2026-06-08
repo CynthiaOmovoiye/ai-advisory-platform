@@ -40,6 +40,11 @@ _COOKIE_NAMES = (
 class CallerContext:
     principal: Principal
     organization_id: str
+    # Session generation carried from the BFF session. The API rejects a token whose
+    # version is behind the user's current ``session_version`` (e.g. after a password
+    # reset), invalidating every previously minted session. Defaults to 0 for tokens
+    # minted before this claim existed and for users who never bumped it.
+    session_version: int = 0
 
 
 def _roles(values: object) -> frozenset[Role]:
@@ -88,7 +93,11 @@ def decode_session(token: str, *, secret: str, issuer: str, audience: str) -> Ca
         global_roles=_roles(claims.get("global_roles")),
         org_roles=org_roles,
     )
-    return CallerContext(principal=principal, organization_id=str(active_org))
+    sv_raw = claims.get("sv", 0)
+    session_version = sv_raw if isinstance(sv_raw, int) else 0
+    return CallerContext(
+        principal=principal, organization_id=str(active_org), session_version=session_version
+    )
 
 
 def extract_token(*, cookies: dict[str, str], authorization: str | None) -> str | None:

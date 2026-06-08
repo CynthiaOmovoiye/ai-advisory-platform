@@ -23,6 +23,19 @@ class VerifyEmailRequest(BaseModel):
     token: str = Field(min_length=20, max_length=512)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=512)
+    password: str = Field(min_length=12, max_length=256)
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
 class ActiveOrganizationRequest(BaseModel):
     organization_id: str = Field(min_length=1)
 
@@ -53,6 +66,7 @@ class AuthProfileOut(BaseModel):
     global_roles: list[str]
     org_roles: dict[str, list[str]]
     memberships: list[MembershipOut]
+    session_version: int
 
     @classmethod
     def from_domain(cls, p: AuthProfile) -> AuthProfileOut:
@@ -66,6 +80,7 @@ class AuthProfileOut(BaseModel):
             global_roles=list(p.global_roles),
             org_roles=p.org_roles,
             memberships=[MembershipOut.from_domain(m) for m in p.memberships],
+            session_version=p.session_version,
         )
 
 

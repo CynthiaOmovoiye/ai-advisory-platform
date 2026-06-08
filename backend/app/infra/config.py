@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "development"
+    log_level: str = "info"
     database_url: str = "postgresql+psycopg://advisory:advisory@localhost:5432/advisory"
 
     # The application connects as a NON-superuser role so Postgres RLS applies to it
@@ -33,6 +34,28 @@ class Settings(BaseSettings):
     auth_issuer: str = "advisory-bff"
     auth_audience: str = "advisory-api"
     local_email_verification_tokens: bool = False
+
+    # Public base URL of the web app — used to build the links inside verification and
+    # password-reset emails (e.g. {app_base_url}/verify-email?token=...).
+    app_base_url: str = "http://localhost:3000"
+
+    # Email delivery. `console` (default) logs the message and is safe with no creds —
+    # used for local dev alongside local_email_verification_tokens. `smtp` sends via any
+    # SMTP server (e.g. Mailtrap). `resend` sends via the Resend HTTP API.
+    email_provider: str = "console"
+    email_from: str = "AI Advisory <onboarding@resend.dev>"
+    email_verification_ttl_hours: int = 24
+    password_reset_ttl_minutes: int = 60
+
+    # SMTP (used when email_provider == "smtp"; Mailtrap works out of the box here).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_starttls: bool = True
+
+    # Resend (used when email_provider == "resend").
+    resend_api_key: str = ""
 
     # LLM / OpenRouter
     openrouter_api_key: str = ""

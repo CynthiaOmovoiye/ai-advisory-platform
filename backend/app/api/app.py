@@ -7,6 +7,7 @@ ties a client-visible error back to the server logs.
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from fastapi import Depends, FastAPI, Request
@@ -55,8 +56,23 @@ def _sanitized(status: int, code: str, message: str, request: Request) -> JSONRe
     )
 
 
+def _configure_logging(settings: Settings) -> None:
+    """Make the application's own loggers (``app.*``) visible at the configured level
+    without disturbing uvicorn's. Notably, the console email provider logs verification
+    and reset links here in local dev — invisible if ``app`` stays at the root default."""
+    level = getattr(logging, settings.log_level.upper(), logging.INFO)
+    app_logger = logging.getLogger("app")
+    app_logger.setLevel(level)
+    if not app_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+        app_logger.addHandler(handler)
+    app_logger.propagate = False
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
+    _configure_logging(settings)
     app = FastAPI(title="AI Advisory Platform API", version="0.1.0")
     rate_limiter = build_rate_limiter(settings)  # one per app instance (test-isolated)
 

@@ -32,6 +32,7 @@ from app.domain.rules.models import Ruleset, ruleset_from_dict
 from app.infra.auth import CallerContext, decode_session, extract_token
 from app.infra.config import Settings, get_settings
 from app.infra.db import make_engine, make_session_factory, set_tenant_scope
+from app.infra.email import build_email_provider
 from app.infra.storage import ObjectStorage, S3Storage
 from app.llm.mock import MockLLMProvider
 from app.llm.openrouter import ModelPricing, OpenRouterConfig, OpenRouterProvider
@@ -55,6 +56,7 @@ from app.services.assessment_service import AssessmentService
 from app.services.document_service import DocumentService
 from app.services.evaluation_service import EvaluationService
 from app.services.metrics_service import SqlMetricsRepository
+from app.services.notification_service import NotificationService, Notifier
 from app.services.organization_service import OrganizationService
 from app.services.recommendation_service import RecommendationService
 from app.services.template_service import TemplateService
@@ -85,6 +87,18 @@ def get_db() -> Iterator[Session]:
         session.close()
 
 
+@lru_cache
+def _notifier() -> Notifier:
+    settings = get_settings()
+    return NotificationService(build_email_provider(settings), settings)
+
+
+def get_notifier() -> Notifier:
+    """The transactional email sender, assembled from configuration (console / SMTP /
+    Resend). Cached because the provider is stateless and config is process-global."""
+    return _notifier()
+
+
 # --------------------------------------------------------------------------- #
 # Authentication — fails closed.
 # --------------------------------------------------------------------------- #
@@ -111,9 +125,14 @@ def get_caller(request: Request, db: Session | None = Depends(get_db)) -> Caller
         audience=settings.auth_audience,
     )
     if isinstance(db, Session):
+        from app.errors import Unauthorized
         from app.services.auth_service import AuthService
 
         profile = AuthService(db).profile_for_user(caller.principal.user_id, caller.organization_id)
+        # Session invalidation: a token minted before the user's current session
+        # generation (e.g. issued prior to a password reset) is rejected. Fails closed.
+        if caller.session_version != profile.session_version:
+            raise Unauthorized("session expired")
         from app.domain.access import Principal, Role
 
         principal = Principal(
@@ -124,7 +143,11 @@ def get_caller(request: Request, db: Session | None = Depends(get_db)) -> Caller
                 for org, roles in profile.org_roles.items()
             },
         )
-        return CallerContext(principal=principal, organization_id=profile.active_org)
+        return CallerContext(
+            principal=principal,
+            organization_id=profile.active_org,
+            session_version=profile.session_version,
+        )
     return caller
 
 

@@ -22,11 +22,22 @@ from sqlalchemy.orm import Session
 
 from app.errors import Conflict, Forbidden, Unauthorized, Unprocessable
 from app.infra.db import set_rls_bypass, set_tenant_scope
-from app.repositories.orm import EmailVerificationToken, Organization, OrganizationMember, User
+from app.repositories.orm import (
+    EmailVerificationToken,
+    Organization,
+    OrganizationMember,
+    PasswordResetToken,
+    User,
+)
+from app.services.notification_service import Notifier
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 _VALID_ROLES = {"admin", "consultant", "org_user"}
+# Token lifetimes. These mirror the defaults the email copy quotes
+# (Settings.email_verification_ttl_hours / password_reset_ttl_minutes).
+_EMAIL_VERIFY_TTL = timedelta(hours=24)
+_RESET_TTL = timedelta(minutes=60)
 _hasher = PasswordHasher()
 # Verified when no user matches so login response time doesn't reveal whether an account
 # exists (timing-based user enumeration). Computed once at import.
@@ -51,6 +62,7 @@ class AuthProfile:
     active_org: str
     global_roles: tuple[str, ...]
     memberships: tuple[Membership, ...]
+    session_version: int = 0
 
     @property
     def org_roles(self) -> dict[str, list[str]]:
@@ -112,8 +124,9 @@ def validate_password(password: str) -> None:
 
 
 class AuthService:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, notifier: Notifier | None = None) -> None:
         self._s = session
+        self._notifier = notifier
 
     def signup(
         self, *, email: str, password: str, name: str | None, organization_name: str
@@ -166,7 +179,7 @@ class AuthService:
                     id=str(uuid.uuid4()),
                     user_id=user_id,
                     token_hash=_hash_token(token),
-                    expires_at=_now() + timedelta(hours=24),
+                    expires_at=_now() + _EMAIL_VERIFY_TTL,
                 ),
             ]
         )
@@ -175,10 +188,10 @@ class AuthService:
             self._s.flush()
         except IntegrityError as exc:
             raise Conflict("account or organization already exists") from exc
-        return SignupResult(
-            profile=self.profile_for_user(user_id, active_org=org_id),
-            verification_token=token,
-        )
+        profile = self.profile_for_user(user_id, active_org=org_id)
+        if self._notifier is not None:
+            self._notifier.send_email_verification(email, token)
+        return SignupResult(profile=profile, verification_token=token)
 
     def verify_email(self, token: str) -> AuthProfile:
         row = self._s.execute(
@@ -233,10 +246,63 @@ class AuthService:
             active_org=selected_org,
             global_roles=(),
             memberships=memberships,
+            session_version=user.session_version,
         )
 
     def switch_active_org(self, *, user_id: str, organization_id: str) -> AuthProfile:
         return self.profile_for_user(user_id, active_org=organization_id)
+
+    def request_password_reset(self, email: str) -> None:
+        """Issue a reset token and email it — but only if the account exists. Returns
+        nothing and behaves identically whether or not the email matched, so the caller
+        can present a single generic response and never reveal which addresses exist."""
+        user = self._s.execute(
+            select(User).where(User.email == _normalize_email(email))
+        ).scalar_one_or_none()
+        if user is None or user.status != "active":
+            self._audit(None, None, "auth.password_reset_requested_unknown", None)
+            return
+        token = secrets.token_urlsafe(32)
+        self._s.add(
+            PasswordResetToken(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                token_hash=_hash_token(token),
+                expires_at=_now() + _RESET_TTL,
+            )
+        )
+        self._audit(user.id, None, "auth.password_reset_requested", user.id)
+        self._s.flush()
+        if self._notifier is not None:
+            self._notifier.send_password_reset(user.email, token)
+
+    def reset_password(self, *, token: str, new_password: str) -> None:
+        """Consume a reset token, set the new password, and invalidate every existing
+        session for the account (bumping ``session_version``). Single-use: the token and
+        any other outstanding reset tokens for the user are marked used."""
+        validate_password(new_password)
+        row = self._s.execute(
+            select(PasswordResetToken).where(PasswordResetToken.token_hash == _hash_token(token))
+        ).scalar_one_or_none()
+        if row is None or row.used_at is not None or _as_utc(row.expires_at) < _now():
+            raise Unauthorized("invalid or expired reset token")
+        user = self._s.get(User, row.user_id)
+        if user is None or user.status != "active":
+            raise Unauthorized("invalid or expired reset token")
+        user.password_hash = hash_password(new_password)
+        # Invalidate all outstanding sessions: tokens minted before this bump are rejected.
+        user.session_version += 1
+        now = _now()
+        row.used_at = now
+        for other in self._s.execute(
+            select(PasswordResetToken).where(
+                PasswordResetToken.user_id == user.id,
+                PasswordResetToken.used_at.is_(None),
+            )
+        ).scalars():
+            other.used_at = now
+        self._audit(user.id, None, "auth.password_reset_completed", user.id)
+        self._s.flush()
 
     def _memberships(self, user_id: str) -> tuple[Membership, ...]:
         # Loading a user's own memberships is an identity operation that spans orgs and
