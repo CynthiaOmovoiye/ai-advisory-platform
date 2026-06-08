@@ -175,16 +175,33 @@ what each phase produces are defined in
 [`docs/portfolio-story.md`](docs/portfolio-story.md#build-phases). Code lands against
 this design, not ahead of it.
 
-## Local development (target topology)
+## Run the whole thing
 
-See [`docs/deployment-guide.md`](docs/deployment-guide.md) and
-[`docs/onboarding-guide.md`](docs/onboarding-guide.md). In short:
+One command brings up the full stack on Postgres — no `OPENROUTER_API_KEY` needed
+(the LLM layer falls back to a deterministic, grounded mock when no key is set):
 
 ```bash
-cp .env.example .env          # fill in OPENROUTER_API_KEY, secrets
-docker compose up -d          # postgres, redis, minio, api, worker, web
-# migrations + seed run via the api container entrypoint
+cp .env.example .env
+docker compose up --build        # postgres + redis + minio + api + worker + web
 ```
+
+The `api` entrypoint runs Alembic migrations and seeds a demo org + assessment, then:
+
+| Service | URL |
+|---|---|
+| Web app | http://localhost:3000 |
+| API + OpenAPI docs | http://localhost:8000/v1 · http://localhost:8000/docs |
+| MinIO console | http://localhost:9001 |
+
+**Click-through demo:** open the web app → **Sign in** (any email/password — the demo
+provider issues an admin session for `demo-org`) → **Assessments** → open the seeded
+assessment → **Complete** (rule engine + grounded LLM enhancement) → review and
+**approve** the findings → **Publish report** (HTML→PDF, stored in MinIO) → check the
+**Admin** and **Evaluation** dashboards.
+
+For production topology, secrets, and operations see
+[`docs/deployment-guide.md`](docs/deployment-guide.md) and
+[`docs/onboarding-guide.md`](docs/onboarding-guide.md).
 
 ---
 

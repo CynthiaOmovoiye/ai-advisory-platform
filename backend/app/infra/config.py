@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "development"
     database_url: str = "postgresql+psycopg://advisory:advisory@localhost:5432/advisory"
@@ -45,7 +45,9 @@ class Settings(BaseSettings):
 
     @property
     def llm_enabled(self) -> bool:
-        return bool(self.openrouter_api_key)
+        # A blank/whitespace key (or a stray inline-comment value) means "use the mock".
+        key = self.openrouter_api_key.strip()
+        return bool(key) and not key.startswith("#")
 
 
 @lru_cache

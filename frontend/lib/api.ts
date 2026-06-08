@@ -26,7 +26,11 @@ export interface RecommendationPatch {
   status?: "approved" | "rejected";
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/v1";
+// Server-only: this client runs inside the BFF route handlers. Prefer a server var
+// (API_BASE_URL, e.g. http://api:8000/v1 inside the Docker network) so it can be set
+// at runtime; fall back to the public var, then localhost.
+const BASE_URL =
+  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/v1";
 
 export class ApiRequestError extends Error {
   constructor(

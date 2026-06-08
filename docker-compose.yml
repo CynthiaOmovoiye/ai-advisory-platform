@@ -1,6 +1,7 @@
 # Local development topology for the AI Advisory Platform.
-# This is the design baseline — service boundaries match the architecture doc.
-# Images/build contexts are referenced as they will exist once code lands.
+# `cp .env.example .env` then `docker compose up --build` brings up the full stack:
+# Postgres (pgvector) + Redis + MinIO + the FastAPI API + Celery worker + Next.js web.
+# The api entrypoint runs Alembic migrations and seeds a demo org/assessment.
 
 services:
   postgres:
@@ -9,11 +10,12 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-advisory}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-advisory}
       POSTGRES_DB: ${POSTGRES_DB:-advisory}
-    ports: ["5432:5432"]
+    # Internal-only (reached as `postgres:5432` on the compose network). Uncomment to
+    # expose on the host: ports: ["5432:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # schema.sql is applied by Alembic in the api entrypoint; mounted here for reference/init.
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
+      # NOTE: the schema is owned by Alembic (run in the api entrypoint), NOT by an
+      # init script — mounting db/schema.sql here would double-create tables.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-advisory}"]
       interval: 5s
@@ -23,7 +25,7 @@ services:
   redis:
     image: redis:7-alpine                # cache, rate-limit counters, Celery broker
     command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports: ["6379:6379"]
+    # Internal-only (reached as `redis:6379`). Uncomment to expose: ports: ["6379:6379"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -36,7 +38,8 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    ports: ["9000:9000", "9001:9001"]
+    # S3 API (9000) is internal (reached as `minio:9000`); only the console is published.
+    ports: ["9001:9001"]
     volumes:
       - miniodata:/data
     healthcheck:
@@ -45,32 +48,59 @@ services:
       timeout: 3s
       retries: 10
 
+  # One-shot: create the private bucket report PDFs are written to.
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
+      mc mb --ignore-existing local/${STORAGE_BUCKET:-advisory-documents} &&
+      echo 'bucket ready';
+      "
+
   api:
-    build: ./backend                     # FastAPI app (created in the build phase)
+    build: ./backend
+    image: advisory-backend:local        # built once; the worker reuses this image
     env_file: .env
+    environment:
+      STORAGE_ENDPOINT: http://minio:9000
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       minio: { condition: service_healthy }
     ports: ["8000:8000"]
-    # Entrypoint: run Alembic migrations + seed, then uvicorn.
-    command: ["./scripts/start-api.sh"]
+    command: ["./scripts/start-api.sh"]   # migrate -> seed -> uvicorn
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
 
   worker:
-    build: ./backend                     # same image, Celery entrypoint
+    image: advisory-backend:local        # same image as api, Celery entrypoint
     env_file: .env
+    environment:
+      STORAGE_ENDPOINT: http://minio:9000
     depends_on:
-      api: { condition: service_started }
+      api: { condition: service_healthy }
       redis: { condition: service_healthy }
-    # LLM enhancement, evaluation runs, PDF rendering (Playwright/Chromium) live here.
     command: ["celery", "-A", "app.infra.celery_app", "worker", "-l", "info"]
 
   web:
-    build: ./frontend                    # Next.js app
-    env_file: .env
+    build: ./frontend
+    environment:
+      # Server-side BFF reaches the API over the compose network. AUTH_SECRET MUST
+      # match the backend's so the signed session token verifies (ADR-0009).
+      API_BASE_URL: http://api:8000/v1
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-32-bytes-min-shared-secret}
+      AUTH_URL: http://localhost:3000
     depends_on:
-      api: { condition: service_started }
-    ports: ["3000:3000"]
+      api: { condition: service_healthy }
+    # Override the host port if 3000 is taken: WEB_PORT=3001 docker compose up
+    ports: ["${WEB_PORT:-3000}:3000"]
 
 volumes:
   pgdata:

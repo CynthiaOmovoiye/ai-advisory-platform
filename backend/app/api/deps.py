@@ -123,12 +123,13 @@ def require(permission: Permission) -> Callable[..., TenantScope]:
 # --------------------------------------------------------------------------- #
 @lru_cache
 def _baseline_ruleset() -> Ruleset:
-    return ruleset_from_dict(json.loads((_DATA / "rulesets" / "baseline-v1.json").read_text()))
+    text = (_DATA / "rulesets" / "baseline-v1.json").read_text(encoding="utf-8")
+    return ruleset_from_dict(json.loads(text))
 
 
 @lru_cache
 def _baseline_eval_dataset() -> tuple:
-    raw = json.loads((_DATA / "eval" / "baseline-readiness.json").read_text())
+    raw = json.loads((_DATA / "eval" / "baseline-readiness.json").read_text(encoding="utf-8"))
     return tuple(raw["items"])
 
 

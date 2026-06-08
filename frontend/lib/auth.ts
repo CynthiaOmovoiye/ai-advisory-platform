@@ -29,12 +29,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(creds) {
         if (!creds?.email) return null;
         // A real provider verifies the password and loads roles/org from the backend.
+        // The demo user is a global admin so the full UI (review, publish, admin/eval
+        // dashboards) is exercisable end-to-end; swap for least-privilege in production.
         return {
           id: "demo-user",
           email: String(creds.email),
           name: "Demo User",
           org: "demo-org",
-          orgRoles: { "demo-org": ["org_user"] },
+          globalRoles: ["admin"],
         } as unknown as { id: string };
       },
     }),
