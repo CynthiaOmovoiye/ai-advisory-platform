@@ -1,0 +1,77 @@
+# Local development topology for the AI Advisory Platform.
+# This is the design baseline — service boundaries match the architecture doc.
+# Images/build contexts are referenced as they will exist once code lands.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16        # Postgres 16 with pgvector preinstalled (ADR-0008)
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-advisory}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-advisory}
+      POSTGRES_DB: ${POSTGRES_DB:-advisory}
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # schema.sql is applied by Alembic in the api entrypoint; mounted here for reference/init.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/00-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-advisory}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine                # cache, rate-limit counters, Celery broker
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest            # S3-compatible object storage (documents, report PDFs)
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports: ["9000:9000", "9001:9001"]
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend                     # FastAPI app (created in the build phase)
+    env_file: .env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    ports: ["8000:8000"]
+    # Entrypoint: run Alembic migrations + seed, then uvicorn.
+    command: ["./scripts/start-api.sh"]
+
+  worker:
+    build: ./backend                     # same image, Celery entrypoint
+    env_file: .env
+    depends_on:
+      api: { condition: service_started }
+      redis: { condition: service_healthy }
+    # LLM enhancement, evaluation runs, PDF rendering (Playwright/Chromium) live here.
+    command: ["celery", "-A", "app.infra.celery_app", "worker", "-l", "info"]
+
+  web:
+    build: ./frontend                    # Next.js app
+    env_file: .env
+    depends_on:
+      api: { condition: service_started }
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata:
+  miniodata:
