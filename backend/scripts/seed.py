@@ -13,7 +13,7 @@ The demo login (frontend Auth.js Credentials provider) issues a token for org
 from __future__ import annotations
 
 from app.infra.config import get_settings
-from app.infra.db import make_engine, make_session_factory
+from app.infra.db import make_engine, make_session_factory, set_rls_bypass
 from app.repositories.orm import Assessment, Organization, Response
 
 DEMO_ORG = "demo-org"
@@ -37,6 +37,7 @@ def main() -> None:
     session_factory = make_session_factory(engine)
 
     with session_factory() as session:
+        set_rls_bypass(session)  # trusted seed: write across orgs (ADR-0006)
         if session.get(Organization, DEMO_ORG) is not None:
             print(f"[seed] {DEMO_ORG} already present — skipping")
             return

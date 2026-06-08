@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.infra.db import set_rls_bypass
 from app.repositories.orm import (
     Assessment,
     EvaluationRunRow,
@@ -43,6 +44,9 @@ class SqlMetricsRepository:
 
     def collect(self) -> AdminMetrics:
         s = self._s
+        # Admin metrics aggregate ACROSS organizations — an audited, admin-gated cross-org
+        # read, so bypass RLS for this transaction (ADR-0006).
+        set_rls_bypass(s)
         orgs = s.scalar(select(func.count()).select_from(Organization)) or 0
 
         assessments_total = s.scalar(select(func.count()).select_from(Assessment)) or 0

@@ -31,7 +31,7 @@ from app.domain.access import Permission, authorize
 from app.domain.rules.models import Ruleset, ruleset_from_dict
 from app.infra.auth import CallerContext, decode_session, extract_token
 from app.infra.config import Settings, get_settings
-from app.infra.db import make_engine, make_session_factory
+from app.infra.db import make_engine, make_session_factory, set_tenant_scope
 from app.infra.storage import ObjectStorage, S3Storage
 from app.llm.mock import MockLLMProvider
 from app.llm.openrouter import ModelPricing, OpenRouterConfig, OpenRouterProvider
@@ -72,7 +72,8 @@ _DATA = Path(__file__).resolve().parents[2] / "data"
 @lru_cache
 def _session_factory() -> sessionmaker[Session]:
     settings = get_settings()
-    engine = make_engine(settings.database_url)
+    # Connect as the non-superuser app role so Postgres RLS is enforced (ADR-0006).
+    engine = make_engine(settings.effective_app_database_url)
     return make_session_factory(engine)
 
 
@@ -115,10 +116,15 @@ def get_caller(request: Request) -> CallerContext:
 # Authorization — default-deny guard.
 # --------------------------------------------------------------------------- #
 def require(permission: Permission) -> Callable[..., TenantScope]:
-    def guard(caller: CallerContext = Depends(get_caller)) -> TenantScope:
+    def guard(
+        caller: CallerContext = Depends(get_caller), db: Session = Depends(get_db)
+    ) -> TenantScope:
         # Default deny: raises Forbidden unless the caller explicitly holds this
         # permission in their active org. Tenant scope falls out of the same check.
         authorize(caller.principal, permission, caller.organization_id)
+        # Set the RLS variable for this request's transaction (ADR-0006, layer 2):
+        # Postgres itself will now refuse any row outside the caller's org.
+        set_tenant_scope(db, caller.organization_id)
         return TenantScope(
             organization_id=caller.organization_id, acting_user_id=caller.principal.user_id
         )

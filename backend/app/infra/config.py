@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = "postgresql+psycopg://advisory:advisory@localhost:5432/advisory"
 
+    # The application connects as a NON-superuser role so Postgres RLS applies to it
+    # (superusers bypass RLS). Migrations/seed use database_url (the owner); the app +
+    # worker use this. Falls back to database_url when a separate role isn't configured.
+    app_database_url: str = ""
+
     # Shared secret used to verify the session token minted by the Next.js BFF after it
     # validates the Auth.js session (ADR-0009). Empty ⇒ auth fails closed.
     auth_secret: str = ""
@@ -43,6 +48,11 @@ class Settings(BaseSettings):
     max_request_bytes: int = 1_048_576
     max_upload_bytes: int = 26_214_400  # 25 MiB for PDF/DOCX uploads
     cors_allowed_origins: str = "http://localhost:3000"
+
+    @property
+    def effective_app_database_url(self) -> str:
+        """The non-superuser app connection if configured, else the owner connection."""
+        return self.app_database_url or self.database_url
 
     @property
     def llm_enabled(self) -> bool:

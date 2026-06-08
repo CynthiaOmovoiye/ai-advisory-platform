@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from app.infra.celery_app import celery_app
 from app.infra.config import get_settings
-from app.infra.db import make_engine, make_session_factory, session_scope
+from app.infra.db import make_engine, make_session_factory, session_scope, set_tenant_scope
 from app.infra.storage import S3Storage
 from app.reports.renderer import PlaywrightRenderer
 from app.reports.service import ReportService
@@ -32,7 +32,8 @@ def _factory():
     global _engine, _session_factory
     if _session_factory is None:
         settings = get_settings()
-        _engine = make_engine(settings.database_url)
+        # Worker connects as the non-superuser app role too, so RLS applies (ADR-0006).
+        _engine = make_engine(settings.effective_app_database_url)
         _session_factory = make_session_factory(_engine)
     return _session_factory
 
@@ -55,6 +56,7 @@ def generate_report(
     settings = get_settings()
     scope = TenantScope(organization_id=organization_id, acting_user_id=actor_user_id)
     with session_scope(_factory()) as session:
+        set_tenant_scope(session, organization_id)  # RLS scope for the worker (ADR-0006)
         service = ReportService(
             assessments=SqlAssessmentRepository(session),
             recommendations=SqlRecommendationRepository(session),
@@ -81,6 +83,7 @@ def scan_document(
     and marks the document 'clean', it cannot be downloaded (the gate)."""
     settings = get_settings()
     with session_scope(_factory()) as session:
+        set_tenant_scope(session, organization_id)  # RLS scope for the worker (ADR-0006)
         service = DocumentService(
             documents=SqlDocumentRepository(session),
             assessments=SqlAssessmentRepository(session),

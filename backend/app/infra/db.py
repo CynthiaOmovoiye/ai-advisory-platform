@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
-from sqlalchemy import JSON, create_engine
+from sqlalchemy import JSON, create_engine, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -44,3 +44,28 @@ def session_scope(session_factory: sessionmaker[Session]) -> Iterator[Session]:
         raise
     finally:
         session.close()
+
+
+# --------------------------------------------------------------------------- #
+# Row-Level Security helpers (ADR-0006). On Postgres these set transaction-local
+# variables the RLS policies read; on SQLite (tests) they are no-ops, so the
+# app-layer tenant filter remains the sole (still-correct) isolation in tests.
+# --------------------------------------------------------------------------- #
+def _is_postgres(session: Session) -> bool:
+    bind = session.get_bind()
+    return bind is not None and bind.dialect.name == "postgresql"
+
+
+def set_tenant_scope(session: Session, organization_id: str) -> None:
+    """Scope all RLS-protected queries in this transaction to one organization."""
+    if _is_postgres(session):
+        session.execute(
+            text("SELECT set_config('app.current_org', :o, true)"), {"o": organization_id}
+        )
+
+
+def set_rls_bypass(session: Session) -> None:
+    """Allow cross-org access for a trusted, audited operation (admin metrics, seed,
+    migrations). Transaction-local — never leaks beyond the current request."""
+    if _is_postgres(session):
+        session.execute(text("SELECT set_config('app.bypass_rls', 'on', true)"))
