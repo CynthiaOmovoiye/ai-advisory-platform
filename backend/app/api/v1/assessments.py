@@ -10,13 +10,51 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import CallerContext, get_assessment_service, get_caller, get_db, require
+from app.api.deps import (
+    CallerContext,
+    get_assessment_service,
+    get_caller,
+    get_db,
+    get_template_service,
+    require,
+)
 from app.domain.access import Permission
 from app.schemas.recommendation import CompleteAssessmentResponse, RecommendationOut
-from app.schemas.template import AssessmentOut, CreateAssessmentRequest, SaveResponsesRequest
+from app.schemas.template import (
+    AssessmentDetailOut,
+    AssessmentOut,
+    CreateAssessmentRequest,
+    SaveResponsesRequest,
+)
 from app.services.assessment_service import AssessmentService
+from app.services.template_service import TemplateService
 
 router = APIRouter(tags=["Assessments"])
+
+
+@router.get("/assessments", response_model=list[AssessmentOut])
+def list_assessments(
+    _scope=Depends(require(Permission.ASSESSMENT_READ)),
+    caller: CallerContext = Depends(get_caller),
+    svc: AssessmentService = Depends(get_assessment_service),
+) -> list[AssessmentOut]:
+    items = svc.list_assessments(caller.principal, caller.organization_id)
+    return [AssessmentOut.from_domain(a) for a in items]
+
+
+@router.get("/assessments/{assessment_id}", response_model=AssessmentDetailOut)
+def get_assessment(
+    assessment_id: str,
+    _scope=Depends(require(Permission.ASSESSMENT_READ)),
+    caller: CallerContext = Depends(get_caller),
+    svc: AssessmentService = Depends(get_assessment_service),
+    templates: TemplateService = Depends(get_template_service),
+) -> AssessmentDetailOut:
+    a = svc.get_assessment(caller.principal, caller.organization_id, assessment_id)
+    template = None
+    if a.template_id:
+        template = templates.get_template(caller.principal, caller.organization_id, a.template_id)
+    return AssessmentDetailOut.from_domain(a, template)
 
 
 @router.post("/assessments", status_code=status.HTTP_201_CREATED, response_model=AssessmentOut)

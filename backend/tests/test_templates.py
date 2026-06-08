@@ -122,6 +122,19 @@ class TestTemplates(unittest.TestCase):
         with self.assertRaises(NotFound):
             self.assessments.create_from_template(consultant, ORG, "nope")
 
+    def test_list_and_get_assessment_with_template(self):
+        t = self.templates.create_template(consultant, ORG, **TEMPLATE_PAYLOAD)
+        self.templates.publish_template(consultant, ORG, t.id)
+        a = self.assessments.create_from_template(consultant, ORG, t.id)
+        listed = self.assessments.list_assessments(consultant, ORG)
+        self.assertIn(a.id, [x.id for x in listed])
+        got = self.assessments.get_assessment(consultant, ORG, a.id)
+        self.assertEqual(got.template_id, t.id)
+
+    def test_get_unknown_assessment_not_found(self):
+        with self.assertRaises(NotFound):
+            self.assessments.get_assessment(consultant, ORG, "nope")
+
 
 if __name__ == "__main__":
     unittest.main()

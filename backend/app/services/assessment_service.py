@@ -137,6 +137,23 @@ class AssessmentService:
         # review status (the freshly-built objects carry no id yet).
         return self.recommendations.list_for_assessment(assessment_id, scope)
 
+    def list_assessments(
+        self, principal: Principal, organization_id: str
+    ) -> list[AssessmentRecord]:
+        authorize(principal, Permission.ASSESSMENT_READ, organization_id)
+        scope = TenantScope(organization_id=organization_id, acting_user_id=principal.user_id)
+        return self.assessments.list(scope)
+
+    def get_assessment(
+        self, principal: Principal, organization_id: str, assessment_id: str
+    ) -> AssessmentRecord:
+        authorize(principal, Permission.ASSESSMENT_READ, organization_id)
+        scope = TenantScope(organization_id=organization_id, acting_user_id=principal.user_id)
+        record = self.assessments.get(assessment_id, scope)
+        if record is None:
+            raise NotFound("assessment not found")
+        return record
+
     def list_recommendations(
         self, principal: Principal, organization_id: str, assessment_id: str
     ) -> list[Recommendation]:

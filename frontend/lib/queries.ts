@@ -19,6 +19,9 @@ import {
   RecommendationList,
   RecommendationOut,
   ReportOut,
+  AssessmentList,
+  AssessmentDetail,
+  type Assessment,
   TemplateList,
   type Template,
   type Recommendation,
@@ -195,5 +198,33 @@ export function useStartAssessment() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ template_id: templateId }),
       }),
+  });
+}
+
+
+export function useAssessments() {
+  return useQuery<Assessment[]>({
+    queryKey: ["assessments"],
+    queryFn: async () => AssessmentList.parse(await getJson("/api/assessments")),
+  });
+}
+
+export function useAssessmentDetail(id: string) {
+  return useQuery({
+    queryKey: ["assessment", id],
+    queryFn: async () => AssessmentDetail.parse(await getJson(`/api/assessments/${id}/detail`)),
+  });
+}
+
+export function useSaveResponses(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (responses: { key: string; value: unknown }[]) =>
+      getJson(`/api/assessments/${id}/responses`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responses }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["assessment", id] }),
   });
 }

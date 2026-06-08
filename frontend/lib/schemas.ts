@@ -141,6 +141,17 @@ export const AssessmentOut = z.object({
   status: z.string(),
 });
 export type Assessment = z.infer<typeof AssessmentOut>;
+export const AssessmentList = z.array(AssessmentOut);
+
+export const AssessmentDetail = z.object({
+  id: z.string(),
+  template_id: z.string().nullable(),
+  template_name: z.string(),
+  status: z.string(),
+  sections: z.array(SectionOut),
+  responses: z.record(z.string(), z.unknown()),
+});
+export type AssessmentDetail = z.infer<typeof AssessmentDetail>;
 
 /** Sanitized error envelope (matches the backend `Error` schema). */
 export const ApiError = z.object({

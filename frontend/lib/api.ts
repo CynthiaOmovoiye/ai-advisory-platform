@@ -23,6 +23,8 @@ import {
   TemplateOut,
   type Template,
   AssessmentOut,
+  AssessmentList,
+  AssessmentDetail,
   type Assessment,
   type Recommendation,
 } from "./schemas";
@@ -197,4 +199,24 @@ export async function createAssessment(identity: SessionIdentity, templateId: st
   return AssessmentOut.parse(
     await request(identity, `/assessments`, { method: "POST", body: JSON.stringify({ template_id: templateId }) }),
   );
+}
+
+
+export async function listAssessments(identity: SessionIdentity): Promise<Assessment[]> {
+  return AssessmentList.parse(await request(identity, `/assessments`));
+}
+
+export async function getAssessment(identity: SessionIdentity, id: string) {
+  return AssessmentDetail.parse(await request(identity, `/assessments/${id}`));
+}
+
+export async function saveResponses(
+  identity: SessionIdentity,
+  id: string,
+  responses: { key: string; value: unknown }[],
+): Promise<void> {
+  await request(identity, `/assessments/${id}/responses`, {
+    method: "PUT",
+    body: JSON.stringify({ responses }),
+  });
 }

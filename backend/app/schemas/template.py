@@ -113,3 +113,29 @@ class AssessmentOut(BaseModel):
         return cls(
             id=a.id, template_id=a.template_id, template_name=a.template_name, status=a.status
         )
+
+
+class AssessmentDetailOut(BaseModel):
+    """An assessment plus its template's questions and any saved responses — everything
+    the answering UI needs to render and resume the form."""
+
+    id: str
+    template_id: str | None
+    template_name: str
+    status: str
+    sections: list[SectionOut]
+    responses: dict[str, Any]
+
+    @classmethod
+    def from_domain(
+        cls, a: AssessmentRecord, template: TemplateRecord | None
+    ) -> AssessmentDetailOut:
+        sections = TemplateOut.from_domain(template).sections if template else []
+        return cls(
+            id=a.id,
+            template_id=a.template_id,
+            template_name=a.template_name,
+            status=a.status,
+            sections=sections,
+            responses={r["key"]: r["value"] for r in a.responses},
+        )
