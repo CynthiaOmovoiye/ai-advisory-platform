@@ -20,6 +20,7 @@ export interface SessionIdentity {
   activeOrg: string;
   globalRoles?: string[];
   orgRoles?: Record<string, string[]>;
+  sessionVersion?: number;
 }
 
 export async function mintServiceToken(identity: SessionIdentity): Promise<string> {
@@ -34,6 +35,7 @@ export async function mintServiceToken(identity: SessionIdentity): Promise<strin
     org: identity.activeOrg,
     global_roles: identity.globalRoles ?? [],
     org_roles: identity.orgRoles ?? {},
+    sv: identity.sessionVersion ?? 0,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(identity.userId)

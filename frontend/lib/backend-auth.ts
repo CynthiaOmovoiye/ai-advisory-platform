@@ -20,6 +20,7 @@ export interface AuthUser {
   global_roles: string[];
   org_roles: Record<string, string[]>;
   memberships: AuthMembership[];
+  session_version: number;
 }
 
 async function authRequest(path: string, init: RequestInit = {}): Promise<unknown> {
@@ -61,6 +62,23 @@ export async function verifyEmail(token: string): Promise<AuthUser> {
     method: "POST",
     body: JSON.stringify({ token }),
   })) as AuthUser;
+}
+
+export async function requestPasswordReset(email: string): Promise<{ message: string }> {
+  return (await authRequest("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  })) as { message: string };
+}
+
+export async function resetPassword(
+  token: string,
+  password: string,
+): Promise<{ message: string }> {
+  return (await authRequest("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  })) as { message: string };
 }
 
 export async function switchActiveOrganization(

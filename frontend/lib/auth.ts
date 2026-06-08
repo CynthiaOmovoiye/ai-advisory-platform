@@ -17,6 +17,7 @@ declare module "next-auth" {
     globalRoles?: string[];
     orgRoles?: Record<string, string[]>;
     memberships?: AuthMembership[];
+    sessionVersion?: number;
     user: { id: string } & DefaultSession["user"];
   }
 }
@@ -35,6 +36,7 @@ const credentialsProvider = Credentials({
         globalRoles: user.global_roles,
         orgRoles: user.org_roles,
         memberships: user.memberships,
+        sessionVersion: user.session_version,
       } as unknown as { id: string };
     } catch {
       return null;
@@ -53,6 +55,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.orgRoles = u.orgRoles;
         token.globalRoles = u.globalRoles;
         token.memberships = u.memberships;
+        token.sessionVersion = u.sessionVersion;
       }
       if (trigger === "update" && session?.org && token.sub && token.org) {
         const profile = await switchActiveOrganization(
@@ -68,6 +71,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.orgRoles = profile.org_roles;
         token.globalRoles = profile.global_roles;
         token.memberships = profile.memberships;
+        token.sessionVersion = profile.session_version;
       }
       return token;
     },
@@ -77,6 +81,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.orgRoles = token.orgRoles as Record<string, string[]> | undefined;
       session.globalRoles = token.globalRoles as string[] | undefined;
       session.memberships = token.memberships as AuthMembership[] | undefined;
+      session.sessionVersion = token.sessionVersion as number | undefined;
       return session;
     },
   },
@@ -90,5 +95,6 @@ export async function getSessionIdentity(): Promise<SessionIdentity | null> {
     activeOrg: session.org,
     globalRoles: session.globalRoles,
     orgRoles: session.orgRoles,
+    sessionVersion: session.sessionVersion,
   };
 }
