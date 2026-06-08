@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
-from sqlalchemy import JSON, create_engine, text
+from sqlalchemy import JSON, create_engine, event, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -26,6 +26,19 @@ class Base(DeclarativeBase):
 
 def make_engine(url: str, **kw: Any):
     return create_engine(url, future=True, **kw)
+
+
+def enable_sqlite_foreign_keys(engine: Any) -> None:
+    """Turn on SQLite FK enforcement (off by default) so a test engine rejects the FK
+    ordering/orphan bugs that Postgres always rejects in production. Opt-in per engine."""
+    if engine.dialect.name != "sqlite":
+        return
+
+    @event.listens_for(engine, "connect")
+    def _enable_fks(dbapi_conn: Any, _record: Any) -> None:
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 def make_session_factory(engine) -> sessionmaker[Session]:
@@ -64,8 +77,11 @@ def set_tenant_scope(session: Session, organization_id: str) -> None:
         )
 
 
-def set_rls_bypass(session: Session) -> None:
+def set_rls_bypass(session: Session, *, on: bool = True) -> None:
     """Allow cross-org access for a trusted, audited operation (admin metrics, seed,
-    migrations). Transaction-local — never leaks beyond the current request."""
+    migrations, and identity reads of a user's own memberships). Transaction-local —
+    never leaks beyond the current request. Pass ``on=False`` to restore enforcement
+    for the remainder of the same transaction."""
     if _is_postgres(session):
-        session.execute(text("SELECT set_config('app.bypass_rls', 'on', true)"))
+        value = "on" if on else "off"
+        session.execute(text("SELECT set_config('app.bypass_rls', :v, true)"), {"v": value})

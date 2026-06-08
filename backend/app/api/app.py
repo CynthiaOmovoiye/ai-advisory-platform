@@ -21,6 +21,7 @@ from app.api.middleware import build_rate_limiter
 from app.api.v1 import (
     admin,
     assessments,
+    auth,
     documents,
     evaluation,
     organizations,
@@ -144,6 +145,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(assessments.router, prefix="/v1")
+    app.include_router(auth.router, prefix="/v1")
     app.include_router(organizations.router, prefix="/v1")
     app.include_router(recommendations.router, prefix="/v1")
     app.include_router(reports.router, prefix="/v1")

@@ -88,7 +88,7 @@ def get_db() -> Iterator[Session]:
 # --------------------------------------------------------------------------- #
 # Authentication — fails closed.
 # --------------------------------------------------------------------------- #
-def get_caller(request: Request) -> CallerContext:
+def get_caller(request: Request, db: Session | None = Depends(get_db)) -> CallerContext:
     """Resolve the caller from the signed session token (ADR-0007/0009).
 
     Fails closed: no token, bad signature, wrong issuer/audience, or expiry ⇒ 401
@@ -104,12 +104,28 @@ def get_caller(request: Request) -> CallerContext:
         from app.errors import Unauthorized
 
         raise Unauthorized("no session")
-    return decode_session(
+    caller = decode_session(
         token,
         secret=settings.auth_secret,
         issuer=settings.auth_issuer,
         audience=settings.auth_audience,
     )
+    if isinstance(db, Session):
+        from app.services.auth_service import AuthService
+
+        profile = AuthService(db).profile_for_user(caller.principal.user_id, caller.organization_id)
+        from app.domain.access import Principal, Role
+
+        principal = Principal(
+            user_id=profile.id,
+            global_roles=frozenset(Role(r) for r in profile.global_roles),
+            org_roles={
+                org: frozenset(Role(role) for role in roles)
+                for org, roles in profile.org_roles.items()
+            },
+        )
+        return CallerContext(principal=principal, organization_id=profile.active_org)
+    return caller
 
 
 # --------------------------------------------------------------------------- #

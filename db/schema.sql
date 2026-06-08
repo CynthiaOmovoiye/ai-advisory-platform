@@ -33,20 +33,27 @@ $$ LANGUAGE plpgsql;
 CREATE TABLE users (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     email            citext NOT NULL UNIQUE,
-    display_name     text,
-    -- Auth credentials (hashes, sessions, refresh tokens) are owned by the auth
-    -- provider (ADR-0007). This row is the application-side profile.
+    password_hash    text NOT NULL,
+    name             text,
     status           text NOT NULL DEFAULT 'active'
-                        CHECK (status IN ('active','suspended','invited')),
+                        CHECK (status IN ('active','disabled')),
     email_verified_at timestamptz,
-    -- Encrypted-at-rest application secrets / sensitive profile fields live in
-    -- encrypted columns (pgcrypto/app-layer KMS). Kept minimal by design.
     created_at       timestamptz NOT NULL DEFAULT now(),
     updated_at       timestamptz NOT NULL DEFAULT now(),
     deleted_at       timestamptz                       -- soft delete
 );
 CREATE TRIGGER trg_users_updated BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE email_verification_tokens (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash  text NOT NULL UNIQUE,
+    expires_at  timestamptz NOT NULL,
+    used_at     timestamptz,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_email_verification_tokens_user ON email_verification_tokens(user_id);
 
 CREATE TABLE roles (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),

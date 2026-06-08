@@ -43,15 +43,14 @@ class CallerContext:
 
 
 def _roles(values: object) -> frozenset[Role]:
-    """Map role strings to known Roles, ignoring anything unrecognised (fail safe —
-    an unknown role grants nothing, ADR-0007)."""
+    """Map role strings to known Roles. Unknown roles reject the token."""
     out: set[Role] = set()
     if isinstance(values, list):
         for v in values:
             try:
                 out.add(Role(v))
             except ValueError:
-                continue
+                raise Unauthorized("session contains unknown role") from None
     return frozenset(out)
 
 

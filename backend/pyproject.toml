@@ -21,6 +21,7 @@ dependencies = [
     "pydantic-settings>=2.3",
     "sqlalchemy>=2.0",
     "alembic>=1.13",
+    "argon2-cffi>=23.1",      # password hashing for credentials auth
     "httpx>=0.27",            # OpenRouter client
     "pyjwt>=2.8",             # BFF session-token verification (ADR-0009)
     "python-multipart>=0.0.9",  # file uploads

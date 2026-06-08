@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     auth_secret: str = ""
     auth_issuer: str = "advisory-bff"
     auth_audience: str = "advisory-api"
+    local_email_verification_tokens: bool = False
 
     # LLM / OpenRouter
     openrouter_api_key: str = ""
