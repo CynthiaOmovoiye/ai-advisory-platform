@@ -1,35 +1,38 @@
-import type { Recommendation } from "@/lib/schemas";
+import { Sparkles, Cpu } from "lucide-react";
 
+import type { Recommendation } from "@/lib/schemas";
+import { Card, CardContent } from "@/components/ui/card";
 import { SeverityBadge } from "./SeverityBadge";
 
 export function RecommendationCard({ rec }: { rec: Recommendation }) {
+  const grounded = rec.provenance.source === "llm" && rec.provenance.grounding_passed;
   return (
-    <article className="rounded-lg border bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2">
-        <SeverityBadge severity={rec.severity} />
-        <span className="text-xs text-slate-500">{rec.rule_code}</span>
-        {/* Provenance — shows whether the narrative is LLM-grounded or a deterministic fallback */}
-        <span className="ml-auto text-xs text-slate-400">
-          {rec.provenance.source === "llm" && rec.provenance.grounding_passed
-            ? "AI-enhanced ✓ grounded"
-            : "deterministic"}
-        </span>
-      </div>
-      <h3 className="mt-2 font-semibold">{rec.title}</h3>
-      <dl className="mt-2 space-y-1 text-sm text-slate-700">
-        <div>
-          <dt className="inline font-medium text-slate-500">Finding: </dt>
-          <dd className="inline">{rec.finding}</dd>
+    <Card>
+      <CardContent className="space-y-3">
+        <div className="flex items-center gap-2">
+          <SeverityBadge severity={rec.severity} />
+          <span className="font-mono text-xs text-muted-foreground">{rec.rule_code}</span>
+          <span className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground">
+            {grounded ? <Sparkles className="size-3.5" /> : <Cpu className="size-3.5" />}
+            {grounded ? "AI-enhanced · grounded" : "deterministic"}
+          </span>
         </div>
-        <div>
-          <dt className="inline font-medium text-slate-500">Rationale: </dt>
-          <dd className="inline">{rec.rationale}</dd>
-        </div>
-        <div>
-          <dt className="inline font-medium text-slate-500">Remediation: </dt>
-          <dd className="inline">{rec.remediation}</dd>
-        </div>
-      </dl>
-    </article>
+        <h3 className="font-semibold">{rec.title}</h3>
+        <dl className="space-y-1.5 text-sm">
+          <Row label="Finding" value={rec.finding} />
+          <Row label="Rationale" value={rec.rationale} />
+          <Row label="Remediation" value={rec.remediation} />
+        </dl>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="inline font-medium text-muted-foreground">{label}: </dt>
+      <dd className="inline text-foreground/90">{value}</dd>
+    </div>
   );
 }

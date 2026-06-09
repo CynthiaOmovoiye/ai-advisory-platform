@@ -1,33 +1,33 @@
 import type { Metadata } from "next";
+import { Geist } from "next/font/google";
 
-import { UserMenu } from "@/components/UserMenu";
+import { SiteHeader } from "@/components/SiteHeader";
+import { cn } from "@/lib/utils";
 import { Providers } from "./providers";
 import "./globals.css";
 
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+
 export const metadata: Metadata = {
   title: "AI Advisory Platform",
-  description: "Assess organizational readiness for AI adoption.",
+  description: "Assess organizational readiness for AI adoption — deterministic findings, AI-explained.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
+    <html lang="en" className={cn("font-sans", geist.variable)}>
+      <body className="min-h-screen bg-background text-foreground antialiased">
         <Providers>
-          <header className="border-b bg-white">
-            <div className="mx-auto flex max-w-5xl items-center gap-6 px-6 py-4">
-              <a href="/" className="text-lg font-semibold">AI Advisory Platform</a>
-              <nav className="flex gap-4 text-sm text-slate-600">
-                <a href="/assessments" className="hover:text-slate-900">Assessments</a>
-                <a href="/templates" className="hover:text-slate-900">Templates</a>
-                <a href="/members" className="hover:text-slate-900">Members</a>
-                <a href="/admin" className="hover:text-slate-900">Admin</a>
-                <a href="/eval" className="hover:text-slate-900">Evaluation</a>
-              </nav>
-              <UserMenu />
-            </div>
-          </header>
-          <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
+          <div className="flex min-h-screen flex-col">
+            <SiteHeader />
+            <main className="flex-1">{children}</main>
+            <footer className="border-t py-6">
+              <div className="mx-auto max-w-6xl px-4 text-xs text-muted-foreground sm:px-6">
+                AI Advisory Platform — deterministic findings, AI-explained, every recommendation
+                traceable and grounded.
+              </div>
+            </footer>
+          </div>
         </Providers>
       </body>
     </html>

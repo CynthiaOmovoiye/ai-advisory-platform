@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { MailCheck } from "lucide-react";
+
+import { AuthShell } from "@/components/AuthShell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -10,60 +16,60 @@ export default function ForgotPasswordPage() {
 
   if (message) {
     return (
-      <div className="mx-auto max-w-sm space-y-4 rounded-lg border bg-white p-6">
-        <h2 className="text-lg font-semibold">Check your email</h2>
-        <p className="text-sm text-slate-600">{message}</p>
-        <Link href="/login" className="text-sm font-medium text-slate-900 hover:text-slate-700">
-          Back to sign in
-        </Link>
-      </div>
+      <AuthShell
+        title="Check your email"
+        footer={
+          <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+            Back to sign in
+          </Link>
+        }
+      >
+        <div className="flex flex-col items-center gap-3 py-2 text-center">
+          <span className="grid size-10 place-items-center rounded-full bg-success/10 text-success">
+            <MailCheck className="size-5" />
+          </span>
+          <p className="text-sm text-muted-foreground">{message}</p>
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setPending(true);
-        const res = await fetch("/api/forgot-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        });
-        const body = await res.json().catch(() => null);
-        setPending(false);
-        // Always show the same generic confirmation — no account enumeration.
-        setMessage(
-          body?.message ??
-            "If an account exists for that email, a password reset link has been sent.",
-        );
-      }}
-      className="mx-auto max-w-sm space-y-4 rounded-lg border bg-white p-6"
-    >
-      <h2 className="text-lg font-semibold">Reset your password</h2>
-      <p className="text-sm text-slate-600">
-        Enter your email and we&apos;ll send you a link to choose a new password.
-      </p>
-      <input
-        type="email"
-        required
-        placeholder="Email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="w-full rounded-md border px-3 py-2 text-sm"
-      />
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
-      >
-        {pending ? "Sending..." : "Send reset link"}
-      </button>
-      <p className="text-center text-sm text-slate-600">
-        <Link href="/login" className="font-medium text-slate-900 hover:text-slate-700">
+    <AuthShell
+      title="Reset your password"
+      description="Enter your email and we'll send you a link to choose a new password."
+      footer={
+        <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
           Back to sign in
         </Link>
-      </p>
-    </form>
+      }
+    >
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setPending(true);
+          const res = await fetch("/api/forgot-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+          const body = await res.json().catch(() => null);
+          setPending(false);
+          setMessage(
+            body?.message ??
+              "If an account exists for that email, a password reset link has been sent.",
+          );
+        }}
+        className="space-y-4"
+      >
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
+        </div>
+        <Button type="submit" disabled={pending} className="w-full">
+          {pending ? "Sending…" : "Send reset link"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }

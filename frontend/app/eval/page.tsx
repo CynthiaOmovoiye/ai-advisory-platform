@@ -1,5 +1,11 @@
 "use client";
 
+import { Play } from "lucide-react";
+
+import { PageContainer, PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/SeverityBadge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { useEvaluationRuns, useTriggerEvaluation } from "@/lib/queries";
 
 export default function EvalDashboard() {
@@ -7,65 +13,59 @@ export default function EvalDashboard() {
   const trigger = useTriggerEvaluation();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Evaluation</h2>
-        <button
-          onClick={() => trigger.mutate()}
-          disabled={trigger.isPending}
-          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-        >
-          {trigger.isPending ? "Running…" : "Run evaluation"}
-        </button>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Evaluation"
+        description="Regression-test AI output quality against a gold dataset."
+        action={
+          <Button onClick={() => trigger.mutate()} disabled={trigger.isPending}>
+            <Play className="size-4" />
+            {trigger.isPending ? "Running…" : "Run evaluation"}
+          </Button>
+        }
+      />
 
       {trigger.isError && (
-        <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{(trigger.error as Error).message}</p>
+        <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {(trigger.error as Error).message}
+        </p>
       )}
 
-      <div className="overflow-hidden rounded-lg border bg-white">
+      <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-2">Dataset</th>
-              <th className="px-4 py-2">Model</th>
-              <th className="px-4 py-2">Accuracy</th>
-              <th className="px-4 py-2">Hallucination</th>
-              <th className="px-4 py-2">Consistency</th>
-              <th className="px-4 py-2">Status</th>
+          <thead>
+            <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-4 py-2.5 font-medium">Dataset</th>
+              <th className="px-4 py-2.5 font-medium">Model</th>
+              <th className="px-4 py-2.5 font-medium">Accuracy</th>
+              <th className="px-4 py-2.5 font-medium">Hallucination</th>
+              <th className="px-4 py-2.5 font-medium">Consistency</th>
+              <th className="px-4 py-2.5 font-medium">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {(runs.data ?? []).map((r) => (
-              <tr key={r.id}>
-                <td className="px-4 py-2">{r.dataset_name}</td>
-                <td className="px-4 py-2 text-slate-500">{r.model_id}</td>
-                <td className="px-4 py-2">{r.accuracy.toFixed(3)}</td>
-                <td className="px-4 py-2">{r.hallucination_rate.toFixed(3)}</td>
-                <td className="px-4 py-2">{r.consistency.toFixed(3)}</td>
-                <td className="px-4 py-2">
-                  <span
-                    className={
-                      r.status === "completed"
-                        ? "text-green-700"
-                        : "font-medium text-red-700"
-                    }
-                  >
-                    {r.status}
-                  </span>
+              <tr key={r.id} className="hover:bg-accent/30">
+                <td className="px-4 py-3 font-medium">{r.dataset_name}</td>
+                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.model_id}</td>
+                <td className="px-4 py-3 tabular-nums">{r.accuracy.toFixed(3)}</td>
+                <td className="px-4 py-3 tabular-nums">{r.hallucination_rate.toFixed(3)}</td>
+                <td className="px-4 py-3 tabular-nums">{r.consistency.toFixed(3)}</td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={r.status} />
                 </td>
               </tr>
             ))}
             {runs.data?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                   No runs yet — trigger one to gate against regression.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
-      </div>
-    </div>
+      </Card>
+    </PageContainer>
   );
 }
