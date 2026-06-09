@@ -5,7 +5,9 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Install dependencies against the lockfile first (better layer caching).
-COPY package.json package-lock.json ./
+# .npmrc carries legacy-peer-deps (React 19 + Base UI peer ranges) — copy it before
+# npm ci so the install resolves the same way it does locally.
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 
 COPY . .
