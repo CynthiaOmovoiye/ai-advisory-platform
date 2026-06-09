@@ -19,6 +19,9 @@ If you only read three files, read these:
 2. [`docs/portfolio-story.md`](docs/portfolio-story.md) — the reasoning behind every major decision.
 3. [`docs/security/threat-model.md`](docs/security/threat-model.md) — how it can be attacked and how that's mitigated.
 
+New to the app and want to *use* it? Start with the
+[**user guide**](docs/user-guide.md) — a step-by-step manual of the flow and every page.
+
 ---
 
 ## The core thesis
