@@ -14,7 +14,16 @@ from datetime import UTC, datetime
 
 from app.infra.config import get_settings
 from app.infra.db import make_engine, make_session_factory, set_rls_bypass
-from app.repositories.orm import Assessment, Organization, OrganizationMember, Response, User
+from app.repositories.orm import (
+    Assessment,
+    AssessmentSection,
+    AssessmentTemplate,
+    Organization,
+    OrganizationMember,
+    Question,
+    Response,
+    User,
+)
 from app.services.auth_service import hash_password
 
 DEMO_ORG = "00000000-0000-4000-8000-000000000001"
@@ -22,6 +31,114 @@ DEMO_ASSESSMENT = "assess-a"
 DEMO_USER = "00000000-0000-4000-8000-000000000002"
 DEMO_EMAIL = "demo@example.com"
 DEMO_PASSWORD = "ChangeMe123!"  # noqa: S105 - documented local-dev seed credential
+
+# A richer, multi-section published template so the template -> start -> answer ->
+# complete -> review flow is demonstrable end to end. Question KEYS line up with the
+# baseline-v1 ruleset, so completing an assessment from it fires real findings.
+# (model_monitoring is deliberately omitted so OPS-OBS-005 — "fires when model_monitoring
+# is absent" — triggers.)
+DEMO_TEMPLATE = "tmpl-ai-readiness-demo"
+DEMO_TEMPLATE_SECTIONS: list[tuple[str, list[tuple[str, str, str, dict[str, object]]]]] = [
+    (
+        "Security & Access",
+        [
+            (
+                "mfa_enabled",
+                "Is multi-factor authentication enforced for all users?",
+                "single_select",
+                {"required": True},
+            ),
+            (
+                "sensitive_data_present",
+                "Does the organization process sensitive or personal data?",
+                "single_select",
+                {"required": True},
+            ),
+        ],
+    ),
+    (
+        "Data Maturity",
+        [
+            (
+                "data_quality_score",
+                "Rate your overall data quality (1 = poor, 5 = excellent).",
+                "number",
+                {"required": True, "min": 1, "max": 5},
+            ),
+        ],
+    ),
+    (
+        "Governance",
+        [
+            (
+                "ai_governance_owner",
+                "Who owns AI governance and accountability?",
+                "single_select",
+                {"required": True, "options": ["none", "data_team", "executive_sponsor"]},
+            ),
+        ],
+    ),
+    (
+        "Compliance & Privacy",
+        [
+            (
+                "dpia_completed",
+                "Has a Data Protection Impact Assessment (DPIA) been completed?",
+                "single_select",
+                {"required": True},
+            ),
+        ],
+    ),
+    (
+        "AI Roadmap",
+        [
+            (
+                "planned_capabilities",
+                "Which AI capabilities are you planning to adopt?",
+                "multi_select",
+                {"options": ["rag", "agents", "automation", "analytics"]},
+            ),
+            ("ai_use_cases", "Briefly describe your top one or two AI use cases.", "long_text", {}),
+        ],
+    ),
+]
+
+
+def seed_demo_template(session) -> None:
+    """Insert the published demo template (idempotent)."""
+    if session.get(AssessmentTemplate, DEMO_TEMPLATE) is not None:
+        return
+    session.add(
+        AssessmentTemplate(
+            id=DEMO_TEMPLATE,
+            category="ai_readiness",
+            title="AI Readiness — Comprehensive (demo)",
+            description="A multi-section readiness questionnaire wired to the baseline-v1 ruleset.",
+            version=1,
+            status="published",
+        )
+    )
+    session.flush()
+    for si, (title, questions) in enumerate(DEMO_TEMPLATE_SECTIONS):
+        section_id = f"{DEMO_TEMPLATE}-s{si}"
+        session.add(
+            AssessmentSection(id=section_id, template_id=DEMO_TEMPLATE, title=title, order_index=si)
+        )
+        session.flush()
+        for qi, (key, prompt, qtype, config) in enumerate(questions):
+            session.add(
+                Question(
+                    id=f"{section_id}-q{qi}",
+                    section_id=section_id,
+                    key=key,
+                    prompt=prompt,
+                    type=qtype,
+                    config=config,
+                    order_index=qi,
+                )
+            )
+    session.flush()
+
 
 # Responses crafted to fire COMP-PII-004 (critical), SEC-MFA-001 (high),
 # GOV-OWN-002 + DATA-QLT-003 (medium), OPS-OBS-005 (low), INF-VEC-006 (info).
@@ -74,16 +191,19 @@ def main() -> None:
                 )
             )
             session.flush()
+        # Always ensure the demo template exists, even on an already-seeded database.
+        seed_demo_template(session)
         if session.get(Assessment, DEMO_ASSESSMENT) is not None:
             session.commit()
-            print("[seed] demo user/org already present — assessment already seeded")
+            print("[seed] demo user/org/template present — assessment already seeded")
             return
         session.flush()
         session.add(
             Assessment(
                 id=DEMO_ASSESSMENT,
                 organization_id=DEMO_ORG,
-                template_name="AI Readiness",
+                template_id=DEMO_TEMPLATE,  # link to the demo template so answers pre-fill
+                template_name="AI Readiness — Comprehensive (demo)",
                 ruleset_name="baseline",
                 ruleset_version=1,
                 status="in_progress",

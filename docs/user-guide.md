@@ -133,6 +133,53 @@ That's the entire product loop. Everything below is the detail.
 
 ---
 
+## 6b. Scripted demo: the full template flow (≈3 minutes)
+
+The seed also ships a **published, multi-section template** —
+**"AI Readiness — Comprehensive (demo)"** — so you can show the *whole* journey, starting
+from the template, not just a pre-filled assessment. Its question **keys** are wired to
+the `baseline-v1` ruleset, so real answers produce real findings.
+
+Its five sections:
+
+| Section | Question (key) | Type |
+|---|---|---|
+| Security & Access | Is MFA enforced? (`mfa_enabled`) | Yes/No |
+| | Process sensitive data? (`sensitive_data_present`) | Yes/No |
+| Data Maturity | Data quality 1–5 (`data_quality_score`) | Number |
+| Governance | Who owns AI governance? (`ai_governance_owner`) | Select (none / data_team / executive_sponsor) |
+| Compliance & Privacy | DPIA completed? (`dpia_completed`) | Yes/No |
+| AI Roadmap | Planned capabilities (`planned_capabilities`) | Multi-select (rag / agents / automation / analytics) |
+| | Top AI use cases (`ai_use_cases`) | Long text |
+
+**Run it (the talk track):**
+
+1. Sign in as `demo@example.com` / `ChangeMe123!`.
+2. **Templates** → open **"AI Readiness — Comprehensive (demo)"** to show the section/
+   question structure (this is exactly what the *Author a new template* form builds — point
+   that out). It's already **published**, so it shows **Start**.
+3. Click **Start** → you're dropped into a fresh assessment with all five sections.
+4. Answer to trigger findings (this is the realistic "unprepared org" profile):
+   - MFA enforced → **No**
+   - Process sensitive data → **Yes**
+   - Data quality → **2**
+   - AI governance owner → **none**
+   - DPIA completed → **No**
+   - Planned capabilities → tick **rag**
+5. **Save & complete.** You'll get **six findings** spanning every severity:
+
+   `COMP-PII-004` critical · `SEC-MFA-001` high · `GOV-OWN-002` medium ·
+   `DATA-QLT-003` medium · `OPS-OBS-005` low · `INF-VEC-006` info
+
+6. **Approve** them, then **Publish report**.
+
+> Want to show authoring from scratch instead? On the **Templates** page, fill in *Author a
+> new template* — note that each question's **key** is what links it to a rule. Use a key
+> like `mfa_enabled` and the MFA rule will evaluate it; use an arbitrary key and the engine
+> simply won't have a rule for it (no finding). That key↔rule contract is the whole trick.
+
+---
+
 ## 7. Page-by-page reference
 
 ### Landing — `/`
